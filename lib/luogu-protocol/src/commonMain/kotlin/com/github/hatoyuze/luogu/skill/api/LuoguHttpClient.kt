@@ -106,6 +106,11 @@ internal class LuoguHttpClient {
         this.client = client
     }
 
+    /** 关闭底层 HttpClient，释放引擎线程与连接池资源。 */
+    fun close() {
+        client.close()
+    }
+
     // ── 请求构建 ──
 
     private fun HttpRequestBuilder.luoguHeaders(referer: String = DEFAULT_REFERER) {

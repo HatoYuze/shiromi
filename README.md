@@ -27,6 +27,19 @@ DeepSeek 客户端与工具调用 DSL 由外部库
 ./gradlew :composeApp:run  # 本地启动桌面客户端
 ```
 
+> 注：`composeApp` 内嵌浏览器（wvbridge fork，`lib/wvbridge`）用于洛谷浏览器登录。桌面端
+> 需要对应平台的原生 WebView 引擎：Windows 需 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
+> （Win11 自带），Linux 需 `libwebkit2gtk-4.1-0`，macOS 使用系统 WKWebView。Linux 上从源码
+> 构建还需 `libwebkit2gtk-4.1-dev libgtk-3-dev cmake`；若本机缺少这些工具链，可用
+> `-Pwvbridge.skipNative=true` 跳过原生库构建（仅编译，登录功能不可用）。
+
+## 洛谷登录
+
+- **浏览器登录（推荐）**：设置页 → Luogu API →「浏览器登录」，在应用内打开洛谷登录页，
+  登录成功后自动提取会话 Cookie（含 HttpOnly 的 `__client_id`）并真实 API 验证后写入配置，
+  同时自动补全 UID。
+- **手动粘贴**：从浏览器 DevTools 复制完整 Cookie 粘贴到设置页（兜底路径，始终可用）。
+
 ## 运行参数
 
 桌面客户端支持以下 JVM 系统属性：

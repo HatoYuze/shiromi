@@ -75,6 +75,37 @@ class LuoguApiTest {
         val r = api.searchProblems()
         assertEquals(200, r.status)
     }
+
+    // ═══════════════ fetchLoggedInUid ═══════════════
+
+    @Test fun `fetchLoggedInUid returns uid when logged in`() = runTest {
+        val api = mockApi {
+            respondOk("""{"code":200,"currentUser":{"uid":1825403,"name":"YUKIKY"},"currentData":{}}""")
+        }
+        assertEquals(1825403, api.fetchLoggedInUid())
+    }
+    @Test fun `fetchLoggedInUid returns null when currentUser missing`() = runTest {
+        val api = mockApi { respondOk("""{"code":200,"currentData":{}}""") }
+        assertNull(api.fetchLoggedInUid())
+    }
+    @Test fun `fetchLoggedInUid returns null when uid is zero`() = runTest {
+        val api = mockApi { respondOk("""{"code":200,"currentUser":{"uid":0}}""") }
+        assertNull(api.fetchLoggedInUid())
+    }
+    @Test fun `fetchLoggedInUid returns null when not logged in`() = runTest {
+        val api = mockApi {
+            respond(
+                """{"code":401,"currentUser":null,"currentData":{"errorCode":401,"errorType":"UserUnloginException"}}""",
+                HttpStatusCode.Unauthorized,
+                headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        assertNull(api.fetchLoggedInUid())
+    }
+    @Test fun `fetchLoggedInUid returns null on network failure`() = runTest {
+        val api = mockApi { throw RuntimeException("boom") }
+        assertNull(api.fetchLoggedInUid())
+    }
     @Test fun `403 throws csrf error`() = runTest {
         val api = mockApi { respondError(HttpStatusCode.Forbidden) }
         api.apply { cookie = "c" }
