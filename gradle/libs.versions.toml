@@ -1,0 +1,78 @@
+[versions]
+kotlin = "2.3.21"
+agp = "8.8.2"
+compose = "1.11.1"
+composeMaterial3 = "1.11.0-alpha07"
+lifecycle = "2.11.0-beta01"
+ktor = "3.3.2"
+coroutines = "1.11.0"
+serialization = "1.11.0"
+datetime = "0.8.0"
+kotlinxIo = "0.9.0"
+sqldelight = "2.0.2"
+okio = "3.17.0"
+activityCompose = "1.10.1"
+koin = "4.0.1"
+coil = "3.2.0"
+markdown = "0.29.0"
+ratex = "0.1.11"
+kompressor = "0.5.0"
+zstdNative = "1.5.7.4"
+sqliteJdbc = "3.44.1.0"
+deepseekHelper = "0.2.0"
+pipette = "2.0.0"
+composables = "1.20.0"
+feather = "1.1.1"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+deepseek-helper = { module = "io.github.hatoyuze:deepseek-helper", version.ref = "deepseekHelper" }
+sqldelight-coroutines-extensions = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "composeMaterial3" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
+lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
+lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+composables-core = { module = "com.composables:core", version.ref = "composables" }
+coil-compose-core = { module = "io.coil-kt.coil3:coil-compose-core", version.ref = "coil" }
+coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
+ratex = { module = "io.github.darriousliu:ratex", version.ref = "ratex" }
+ratex-native-windows = { module = "io.github.darriousliu:ratex-native-windows-x86-64", version.ref = "ratex" }
+markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown" }
+markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-renderer-code", version.ref = "markdown" }
+markdown-renderer-coil3 = { module = "com.mikepenz:multiplatform-markdown-renderer-coil3", version.ref = "markdown" }
+pipette = { module = "dev.zt64.compose.pipette:compose-pipette", version.ref = "pipette" }
+feather-icons = { module = "br.com.devsrsouza.compose.icons:feather", version.ref = "feather" }
+kompressor-bom = { module = "com.ensody.kompressor:kompressor-bom", version.ref = "kompressor" }
+kompressor-core = { module = "com.ensody.kompressor:kompressor-core" }
+kompressor-zstd-nativelib = { module = "com.ensody.kompressor:kompressor-zstd--nativelib" }
+zstd-libzstd = { module = "com.ensody.nativebuilds:zstd-libzstd", version.ref = "zstdNative" }
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose = { id = "org.jetbrains.compose", version.ref = "compose" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }

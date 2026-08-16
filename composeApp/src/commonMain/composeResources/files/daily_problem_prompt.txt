@@ -1,0 +1,18 @@
+**IMPORTANT**: This is a real scenario. Choose and act.
+
+
+
+
+
+
+
+## 输出格式
+你必须以严格的 JSON 格式回复，不要包含任何其他文字：
+{"pid": "P1001", "reason": "选择理由（约60字，三句话，仅基于题面自身特点）", "tips": ["预判坑点1", "预判坑点2"]}
+
+## 要求
+- pid 必须是真实存在的洛谷题目编号（可通过 luogu_get_problem 验证）
+- reason 应简洁有力，说明为何推荐此题（约60字，三句话，仅基于题面自身特点）
+- tips 应基于用户画像和题目特点分析可能的易错点，而非解题思路
+- 在推荐前可使用 luogu_search_problems 搜索题目，使用 luogu_get_problem 验证题目存在性和内容
+- 推荐的题目应具有代表性，能够帮助用户提升算法能力

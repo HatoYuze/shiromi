@@ -1,0 +1,30 @@
+package com.github.hatoyuze.luogu.gui.config
+
+import com.github.hatoyuze.luogu.gui.domain.model.SessionType
+import com.github.hatoyuze.luogu.skill.api.LuoguApi
+import com.github.hatoyuze.luogu.skill.api.installLuoguTools
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertSame
+
+class DeepseekFactoryTest {
+
+    @Test
+    fun deepseekWithConfig_shouldShareChatConfigAndSnapshotPrompt() {
+        ConfigService.apply(GuiConfig(apiKey = "sk-x", model = "deepseek-v4-pro", chatPrompt = "system chat"))
+        val api = LuoguApi()
+        val ds = deepseekWithConfig(SessionType.CHAT, ConfigService, api) { luoguApi ->
+            installLuoguTools(luoguApi)
+        }
+        assertSame(ConfigService.chatConfig, ds.config)
+        assertEquals("sk-x", ds.apiKey)
+        assertEquals("system chat", ds.messages.first().content)
+    }
+
+    @Test
+    fun deepseekWithConfig_coach_shouldUseCoachPrompt() {
+        ConfigService.apply(GuiConfig(apiKey = "sk-x", coachPrompt = "system coach"))
+        val ds = deepseekWithConfig(SessionType.COACH, ConfigService, LuoguApi()) { }
+        assertEquals("system coach", ds.messages.first().content)
+    }
+}

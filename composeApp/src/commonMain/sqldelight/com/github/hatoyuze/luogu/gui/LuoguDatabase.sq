@@ -1,0 +1,325 @@
+-- LuoguDatabase.sq — SQLDelight schema for luogu-gui
+
+CREATE TABLE IF NOT EXISTS ChatSession (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'chat',
+    createdAt INTEGER NOT NULL,
+    lastModified INTEGER NOT NULL,
+    last_active_branch_id TEXT NOT NULL DEFAULT 'main'
+);
+
+CREATE TABLE IF NOT EXISTS ChatMessage (
+    id TEXT NOT NULL PRIMARY KEY,
+    sessionId TEXT NOT NULL REFERENCES ChatSession(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    thinkingContent BLOB,
+    toolCalls BLOB,
+    segments BLOB,
+    thinkingElapsedSec INTEGER,
+    totalTokens INTEGER,
+    finishReason TEXT,
+    isUser INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'SENT',
+    timestamp INTEGER NOT NULL,
+    branch_id TEXT NOT NULL DEFAULT 'main',
+    parent_message_id TEXT,
+    deepseek_message_index INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_chatmessage_session_branch
+ON ChatMessage(sessionId, branch_id);
+
+-- Branch metadata — each branch is an independent conversation line
+CREATE TABLE IF NOT EXISTS ChatBranch (
+    id TEXT NOT NULL PRIMARY KEY,
+    sessionId TEXT NOT NULL REFERENCES ChatSession(id) ON DELETE CASCADE,
+    parent_branch_id TEXT,
+    fork_message_id TEXT,
+    edited_message_id TEXT,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS TodoItem (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    completed INTEGER NOT NULL DEFAULT 0,
+    createdAt INTEGER NOT NULL
+);
+
+-- ChatSession queries
+selectAllSessions:
+SELECT * FROM ChatSession ORDER BY lastModified DESC;
+
+selectSessionsByType:
+SELECT * FROM ChatSession WHERE type = ? ORDER BY lastModified DESC;
+
+insertSession:
+INSERT OR REPLACE INTO ChatSession(id, title, type, createdAt, lastModified, last_active_branch_id)
+VALUES (?, ?, ?, ?, ?, ?);
+
+updateSession:
+UPDATE ChatSession SET title = ?, lastModified = ?, last_active_branch_id = ? WHERE id = ?;
+
+deleteSession:
+DELETE FROM ChatSession WHERE id = ?;
+
+-- ChatMessage queries
+selectMessagesBySession:
+SELECT * FROM ChatMessage WHERE sessionId = ? ORDER BY timestamp ASC;
+
+insertMessage:
+INSERT OR REPLACE INTO ChatMessage(id, sessionId, content, thinkingContent, toolCalls, segments, thinkingElapsedSec, totalTokens, finishReason, isUser, status, timestamp, branch_id, parent_message_id, deepseek_message_index)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateMessage:
+UPDATE ChatMessage SET content = ?, thinkingContent = ?, toolCalls = ?, segments = ?, thinkingElapsedSec = ?, totalTokens = ?, finishReason = ?, status = ?, branch_id = ?, parent_message_id = ?, deepseek_message_index = ? WHERE id = ?;
+
+deleteMessage:
+DELETE FROM ChatMessage WHERE id = ?;
+
+deleteMessagesBySession:
+DELETE FROM ChatMessage WHERE sessionId = ?;
+
+-- Branch queries
+getMessagesByBranch:
+SELECT * FROM ChatMessage WHERE sessionId = ? AND branch_id = ? ORDER BY timestamp ASC;
+
+insertBranch:
+INSERT OR REPLACE INTO ChatBranch(id, sessionId, parent_branch_id, fork_message_id, edited_message_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+getBranchesBySession:
+SELECT * FROM ChatBranch WHERE sessionId = ? ORDER BY created_at ASC;
+
+getBranchesByForkMessage:
+SELECT * FROM ChatBranch WHERE fork_message_id = ?;
+
+deleteBranchesBySession:
+DELETE FROM ChatBranch WHERE sessionId = ?;
+
+-- Todo queries
+selectAllTodos:
+SELECT * FROM TodoItem ORDER BY createdAt DESC;
+
+insertTodo:
+INSERT OR REPLACE INTO TodoItem(id, title, completed, createdAt)
+VALUES (?, ?, ?, ?);
+
+updateTodoCompleted:
+UPDATE TodoItem SET completed = ? WHERE id = ?;
+
+deleteTodo:
+DELETE FROM TodoItem WHERE id = ?;
+
+-- ═══════════════════════════════════════════════════
+-- Coach Memory — student learning history
+-- ═══════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS CoachMemory (
+    studentId TEXT NOT NULL DEFAULT 'default',
+    lastTopic TEXT,
+    lastProblem TEXT,
+    levelScore INTEGER NOT NULL DEFAULT 50,
+    painPoints TEXT NOT NULL DEFAULT '[]',
+    progressPoints TEXT NOT NULL DEFAULT '[]',
+    updatedAt INTEGER NOT NULL
+);
+
+selectMemory:
+SELECT * FROM CoachMemory WHERE studentId = ?;
+
+insertOrReplaceMemory:
+INSERT OR REPLACE INTO CoachMemory(studentId, lastTopic, lastProblem, levelScore, painPoints, progressPoints, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- LevelHistory — history of level score changes per topic
+CREATE TABLE IF NOT EXISTS LevelHistory (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    studentId TEXT NOT NULL DEFAULT 'default',
+    topic TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    problem TEXT
+);
+
+selectLevelHistory:
+SELECT * FROM LevelHistory WHERE studentId = ? ORDER BY id DESC;
+
+insertLevelHistory:
+INSERT INTO LevelHistory(studentId, topic, score, date, problem)
+VALUES (?, ?, ?, ?, ?);
+
+-- CompletedProblem — pids already solved (for dedup)
+CREATE TABLE IF NOT EXISTS CompletedProblem (
+    pid TEXT NOT NULL PRIMARY KEY,
+    completedAt INTEGER NOT NULL
+);
+
+selectAllCompletedProblems:
+SELECT pid FROM CompletedProblem;
+
+insertCompletedProblem:
+INSERT OR REPLACE INTO CompletedProblem(pid, completedAt)
+VALUES (?, ?);
+
+-- CoachRecommendation — recommendations from finished coach sessions
+CREATE TABLE IF NOT EXISTS CoachRecommendation (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    sessionId TEXT NOT NULL,
+    pid TEXT NOT NULL,
+    createdAt INTEGER NOT NULL
+);
+
+selectRecommendationsBySession:
+SELECT * FROM CoachRecommendation WHERE sessionId = ? ORDER BY id ASC;
+
+selectAllRecommendations:
+SELECT DISTINCT pid FROM CoachRecommendation ORDER BY id DESC;
+
+insertRecommendation:
+INSERT INTO CoachRecommendation(sessionId, pid, createdAt)
+VALUES (?, ?, ?);
+
+-- ═══════════════════════════════════════════════════
+-- Calendar Event — user-marked calendar dates
+-- ═══════════════════════════════════════════════════
+
+-- date_epoch_days: UTC+0, from kotlinx.datetime LocalDate.toEpochDays()
+CREATE TABLE IF NOT EXISTS CalendarEventEntity (
+    id TEXT NOT NULL PRIMARY KEY,          -- UUID
+    name TEXT NOT NULL,              -- app-side enforced ≤ 64 chars
+    date_epoch_days INTEGER NOT NULL,      -- UTC+0 days since epoch
+    created_at_ms INTEGER NOT NULL,        -- epoch millis
+    color INTEGER NOT NULL DEFAULT 0,
+    pinned INTEGER NOT NULL DEFAULT 0      -- 0/1, pinned sorts first
+);
+
+-- Active events: all non-expired (date >= today), pinned first
+selectActiveEvents:
+SELECT * FROM CalendarEventEntity
+WHERE date_epoch_days >= ?
+ORDER BY pinned DESC, date_epoch_days ASC;
+
+insertCalendarEvent:
+INSERT OR REPLACE INTO CalendarEventEntity (id, name, date_epoch_days, created_at_ms, color, pinned)
+VALUES (?, ?, ?, ?, ?, ?);
+
+deleteCalendarEvent:
+DELETE FROM CalendarEventEntity WHERE id = ?;
+
+updateCalendarEventPin:
+UPDATE CalendarEventEntity SET pinned = ? WHERE id = ?;
+
+-- ═══════════════════════════════════════════════════
+-- Study Topic — single-row learning progress tracker
+-- ═══════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS StudyTopicEntity (
+    id TEXT NOT NULL PRIMARY KEY DEFAULT 'current',
+    name TEXT NOT NULL DEFAULT '',       -- app-side enforced ≤ 64 chars
+    current_count INTEGER NOT NULL DEFAULT 0,
+    goal_count INTEGER NOT NULL DEFAULT 10
+);
+
+selectStudyTopic:
+SELECT * FROM StudyTopicEntity WHERE id = 'current';
+
+insertOrReplaceStudyTopic:
+INSERT OR REPLACE INTO StudyTopicEntity (id, name, current_count, goal_count)
+VALUES ('current', ?, ?, ?);
+
+-- ═══════════════════════════════════════════════════
+-- ApiCacheEntry — Luogu API response cache (zstd)
+-- ═══════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS ApiCacheEntry (
+    cache_key TEXT NOT NULL PRIMARY KEY,
+    data BLOB NOT NULL,              -- zstd compressed JSON response
+    size_bytes INTEGER NOT NULL,     -- compressed size for stats
+    content_type TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,     -- epoch millis, first cached
+    accessed_at INTEGER NOT NULL,    -- epoch millis, last read (LRU)
+    expire_at INTEGER                -- NULL = permanent; non-NULL = epoch millis
+);
+
+-- Single entry lookup with TTL filtering at SQL level
+selectCacheEntry:
+SELECT data, size_bytes, accessed_at, expire_at
+FROM ApiCacheEntry
+WHERE cache_key = ?
+  AND (expire_at IS NULL OR expire_at > ?);
+
+updateAccessedAt:
+UPDATE ApiCacheEntry SET accessed_at = ? WHERE cache_key = ?;
+
+insertCache:
+INSERT INTO ApiCacheEntry(cache_key, data, size_bytes, content_type, created_at, accessed_at, expire_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+deleteByKey:
+DELETE FROM ApiCacheEntry WHERE cache_key = ?;
+
+deleteAll:
+DELETE FROM ApiCacheEntry;
+
+-- Oldest by access time, key only (avoids BLOB in result)
+selectOldestCacheKey:
+SELECT cache_key FROM ApiCacheEntry ORDER BY accessed_at ASC LIMIT 1;
+
+-- Single-SQL overflow eviction: delete N oldest entries
+deleteOverflow:
+DELETE FROM ApiCacheEntry WHERE cache_key IN (
+    SELECT cache_key FROM ApiCacheEntry ORDER BY accessed_at ASC LIMIT ?
+);
+
+-- Stats: returns Long (not projection type)
+countAll:
+SELECT COUNT(*) FROM ApiCacheEntry;
+
+sumAllSize:
+SELECT COALESCE(SUM(size_bytes), 0) FROM ApiCacheEntry;
+
+-- ═══════════════════════════════════════════════════
+-- Daily Problem — agent context + result cache
+-- ═══════════════════════════════════════════════════
+
+-- Message history for agent context (content only, max 80 messages)
+CREATE TABLE IF NOT EXISTS DailyProblemContext (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    role TEXT NOT NULL,              -- "user" | "assistant"
+    content TEXT NOT NULL,           -- message text
+    created_at_ms INTEGER NOT NULL   -- epoch millis, for TTL eviction
+);
+
+selectDailyProblemContext:
+SELECT * FROM DailyProblemContext ORDER BY id ASC;
+
+selectDailyProblemContextCount:
+SELECT COUNT(*) FROM DailyProblemContext;
+
+-- Delete oldest messages when exceeding 80-message limit
+deleteOldestContextMessages:
+DELETE FROM DailyProblemContext WHERE id IN (
+    SELECT id FROM DailyProblemContext ORDER BY id ASC LIMIT ?
+);
+
+insertDailyProblemMessage:
+INSERT INTO DailyProblemContext(role, content, created_at_ms)
+VALUES (?, ?, ?);
+
+-- Cached daily problem result (keyed by local date epoch days)
+CREATE TABLE IF NOT EXISTS DailyProblemCache (
+    date_epoch_days INTEGER NOT NULL PRIMARY KEY,
+    pid TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    tips TEXT NOT NULL,              -- JSON array string
+    created_at_ms INTEGER NOT NULL
+);
+
+selectDailyProblem:
+SELECT * FROM DailyProblemCache WHERE date_epoch_days = ?;
+
+insertOrReplaceDailyProblem:
+INSERT OR REPLACE INTO DailyProblemCache(date_epoch_days, pid, reason, tips, created_at_ms)
+VALUES (?, ?, ?, ?, ?);

@@ -1,0 +1,14 @@
+package com.github.hatoyuze.luogu.gui.data.log
+
+import com.github.hatoyuze.luogu.gui.data.Logger
+import com.github.hatoyuze.luogu.gui.platform.dataPath
+
+/** iOS：日志位于 Application Support/shiromi/logs。 */
+actual fun platformLogsDirectory(): String = (dataPath / "logs").toString()
+
+/** iOS：使用默认值。 */
+actual fun platformLogTunables(): LogTunables = LogTunables(
+    maxBytes = FileLogSink.DEFAULT_MAX_BYTES,
+    captureAssistantMessages = true,
+    maxBodyBytes = Logger.DEFAULT_MAX_BODY_BYTES,
+)

@@ -1,0 +1,613 @@
+package com.github.hatoyuze.luogu.gui.presentation.components
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.github.hatoyuze.luogu.gui.domain.model.ChatMessageDomainModel
+import com.github.hatoyuze.luogu.gui.domain.model.MessageSegment
+import com.github.hatoyuze.luogu.gui.domain.model.MessageStatus
+import com.github.hatoyuze.luogu.gui.domain.model.TextType
+import com.github.hatoyuze.luogu.gui.domain.model.ToolCallInfo
+import com.github.hatoyuze.luogu.gui.presentation.components.markdown.CachingImageTransformer
+import com.github.hatoyuze.luogu.gui.presentation.components.markdown.MathAwareParagraph
+import com.github.hatoyuze.luogu.gui.presentation.components.markdown.CuteTableAwareTable
+import com.github.hatoyuze.luogu.gui.presentation.components.markdown.traverseUnhandledNode
+import com.github.hatoyuze.luogu.gui.presentation.markdown.FoldableFlavourDescriptor
+import com.github.hatoyuze.luogu.gui.presentation.rememberMarkdownTypography
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
+import com.mikepenz.markdown.compose.elements.highlightedCodeFence
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.model.markdownDimens
+import com.mikepenz.markdown.model.markdownPadding
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.BookOpen
+import compose.icons.feathericons.Check
+import compose.icons.feathericons.CheckCircle
+import compose.icons.feathericons.ChevronDown
+import compose.icons.feathericons.Clipboard
+import compose.icons.feathericons.Code
+import compose.icons.feathericons.Cpu
+import compose.icons.feathericons.FileText
+import compose.icons.feathericons.Filter
+import compose.icons.feathericons.List
+import compose.icons.feathericons.RefreshCw
+import compose.icons.feathericons.Search
+
+
+// ── MessageBubble ──
+
+@Composable
+fun MessageBubble(
+    message: ChatMessageDomainModel,
+    onRetry: () -> Unit,
+    editingMessageId: String? = null,
+    onSendEdit: ((String, String) -> Unit)? = null,
+    onCancelEdit: (() -> Unit)? = null,
+) {
+    val isEditing = editingMessageId == message.id && message.isUser
+    val displayContent = message.content
+    val colorScheme = MaterialTheme.colorScheme
+    val typography = rememberMarkdownTypography(colorScheme = colorScheme)
+    val mdColors = com.mikepenz.markdown.m3.markdownColor(
+        text = colorScheme.onSurface,
+        codeText = colorScheme.primary,
+        codeBackground = colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        inlineCodeText = colorScheme.primary,
+        inlineCodeBackground = colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        linkText = colorScheme.primary,
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = if (message.isUser)
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            else
+                MaterialTheme.colorScheme.surfaceBright,
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (message.isUser)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+            ),
+            modifier = Modifier.align(if (message.isUser) Alignment.End else Alignment.Start)
+                .fillMaxWidth(if (message.isUser) 0.75f else 0.92f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .drawBehind {
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    (if (message.isUser)
+                                        colorScheme.primary
+                                    else
+                                        colorScheme.secondary)
+                                        .copy(alpha = 0.05f),
+                                    Color.Transparent,
+                                )
+                            )
+                        )
+                    }
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // ── Body: segments (new) or legacy rendering (fallback) ──
+                    if (!message.isUser && message.segments != null) {
+                        SegmentedBody(
+                            segments = message.segments,
+                            messageTimestamp = message.timestamp,
+                            isStreaming = message.status == MessageStatus.SENDING,
+                            thinkingElapsedSec = message.thinkingElapsedSec,
+                            mdColors = mdColors,
+                            typography = typography,
+                        )
+                    } else {
+                        // Legacy or user message: render content directly
+                        if (!message.isUser && (!message.thinkingContent.isNullOrBlank() || !message.toolCalls.isNullOrEmpty())) {
+                            ThinkingSection(
+                                content = message.thinkingContent ?: "",
+                                toolCalls = message.toolCalls,
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                            )
+                        }
+                        // Inline editing mode for user messages
+                        if (isEditing) {
+                            var editText by remember(message.id) { mutableStateOf(message.content) }
+                            val textFieldColors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                unfocusedIndicatorColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            )
+                            TextField(
+                                value = editText,
+                                onValueChange = { editText = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onKeyEvent { event ->
+                                        if (event.key == Key.Enter && !event.isShiftPressed && editText.isNotBlank()) {
+                                            onSendEdit?.invoke(message.id, editText)
+                                            true
+                                        } else if (event.key == Key.Escape) {
+                                            onCancelEdit?.invoke()
+                                            true
+                                        } else false
+                                    },
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                ),
+                                colors = textFieldColors,
+                                maxLines = 20,
+                            )
+                        } else if (displayContent.isNotEmpty()) {
+                            SelectionContainer {
+                                Markdown(
+                                    content = displayContent,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = mdColors,
+                                    flavour = FoldableFlavourDescriptor(),
+                                    imageTransformer = CachingImageTransformer,
+                                    components = markdownComponents(
+                                        codeBlock = highlightedCodeBlock,
+                                        codeFence = highlightedCodeFence,
+                                        table = { CuteTableAwareTable(it) },
+                                        paragraph = { MathAwareParagraph(it) },
+                                        custom = { type, model ->
+                                            traverseUnhandledNode(type, model)
+                                        },
+                                    ),
+                                    typography = typography,
+                                    dimens = markdownDimens(dividerThickness = 1.dp, codeBackgroundCornerSize = 12.dp, blockQuoteThickness = 4.dp),
+                                    padding = markdownPadding(block = 8.dp, list = 12.dp, listItemBottom = 8.dp, indentList = 8.dp,
+                                        codeBlock = PaddingValues(16.dp), blockQuote = PaddingValues(horizontal = 24.dp, vertical = 4.dp),
+                                        blockQuoteText = PaddingValues(vertical = 4.dp),
+                                        blockQuoteBar = PaddingValues.Absolute(left = 4.dp, top = 2.dp, right = 4.dp, bottom = 2.dp)),
+                                )
+                            }
+                        }
+                    }
+
+                    // Only show status indicators on assistant messages
+                    if (!message.isUser) {
+                    when (message.status) {
+                        MessageStatus.ABORTED -> {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "⊘ 已中止",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                )
+                            }
+                        }
+                        MessageStatus.SENDING -> {
+                            Text(
+                                text = "...",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        MessageStatus.ERROR -> {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "✕",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Retry",
+                                    modifier = Modifier.clickable { onRetry() },
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
+
+                        MessageStatus.SENT -> {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "✓",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                if (message.totalTokens != null) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "${message.totalTokens} tokens",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                // Show finish-reason warnings that survive session reload
+                                when (message.finishReason) {
+                                    "length" -> {
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = "⚠ 截断",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        )
+                                    }
+                                    "content_filter" -> {
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = "⚠ 过滤",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        )
+                                    }
+                                    "insufficient_system_resource" -> {
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = "⚠ 资源不足",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    } // end if (!message.isUser)
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Segmented body — timeline for thinking/tools, markdown for content
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+private fun SegmentedBody(
+    segments: List<MessageSegment>,
+    messageTimestamp: Long,
+    isStreaming: Boolean,
+    thinkingElapsedSec: Int? = null,
+    mdColors: com.mikepenz.markdown.model.MarkdownColors,
+    typography: com.mikepenz.markdown.model.MarkdownTypography,
+) {
+    // Split into thinking/tool timeline items, problem cards, and content text
+    val timelineItems = mutableListOf<MessageSegment>()
+    val problemCards = mutableListOf<MessageSegment.ProblemCard>()
+    val contentBuf = StringBuilder()
+
+    for (seg in segments) {
+        when (seg) {
+            is MessageSegment.Text -> {
+                when (seg.type) {
+                    TextType.THINKING -> timelineItems.add(seg)
+                    TextType.CONTENT -> contentBuf.append(seg.text)
+                }
+            }
+            is MessageSegment.ToolCall -> {
+                if (!ToolCallDescriber.isHidden(seg.info.name)) {
+                    timelineItems.add(seg)
+                }
+            }
+            is MessageSegment.ProblemCard -> {
+                problemCards.add(seg)
+            }
+            is MessageSegment.AskUser -> { /* rendered as AskUserCard in ChatScreen */ }
+        }
+    }
+
+    // Render timeline if there are thinking/tool items
+    if (timelineItems.isNotEmpty()) {
+        ThinkingTimeline(
+            items = timelineItems,
+            startTimeMs = messageTimestamp,
+            isStreaming = isStreaming,
+            thinkingElapsedSec = thinkingElapsedSec,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+
+    // Render problem cards between timeline and content
+    problemCards.forEach { card ->
+        Spacer(Modifier.height(6.dp))
+        ProblemCardComposable(card)
+    }
+
+    // Render content as markdown
+    val text = contentBuf.toString()
+    if (text.isNotBlank()) {
+        if (problemCards.isNotEmpty()) Spacer(Modifier.height(8.dp))
+        SelectionContainer {
+            Markdown(
+                content = text,
+                modifier = Modifier.fillMaxWidth(),
+                colors = mdColors,
+                flavour = FoldableFlavourDescriptor(),
+                imageTransformer = CachingImageTransformer,
+                components = markdownComponents(
+                    codeBlock = highlightedCodeBlock,
+                    codeFence = highlightedCodeFence,
+                    table = { CuteTableAwareTable(it) },
+                    paragraph = { MathAwareParagraph(it) },
+                    custom = { type, model ->
+                        traverseUnhandledNode(type, model)
+                    },
+                ),
+                typography = typography,
+                dimens = markdownDimens(dividerThickness = 1.dp, codeBackgroundCornerSize = 12.dp, blockQuoteThickness = 4.dp),
+                padding = markdownPadding(block = 8.dp, list = 12.dp, listItemBottom = 8.dp, indentList = 8.dp,
+                    codeBlock = PaddingValues(16.dp), blockQuote = PaddingValues(horizontal = 24.dp, vertical = 4.dp),
+                    blockQuoteText = PaddingValues(vertical = 4.dp),
+                    blockQuoteBar = PaddingValues.Absolute(left = 4.dp, top = 2.dp, right = 4.dp, bottom = 2.dp)),
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ThinkingTimeline — collapsible box with timer + vertical timeline
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+private fun ThinkingTimeline(
+    items: List<MessageSegment>,
+    startTimeMs: Long,
+    isStreaming: Boolean,
+    thinkingElapsedSec: Int? = null,
+    modifier: Modifier = Modifier,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val accentColor = colorScheme.secondary
+    var expanded by remember { mutableStateOf(isStreaming) }
+
+    val elapsedSec = thinkingElapsedSec
+        ?: ((com.github.hatoyuze.luogu.gui.platform.currentTimeMillis() - startTimeMs) / 1000).toInt()
+    val headerText = if (isStreaming) "正在思考..." else "已思考（用时 ${elapsedSec.coerceAtLeast(0)} 秒）"
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = accentColor.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.2f)),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column {
+            // ── Header ──
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = accentColor.copy(alpha = 0.08f),
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(FeatherIcons.Cpu, contentDescription = null, tint = accentColor, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(headerText, style = MaterialTheme.typography.labelLarge.copy(color = accentColor), modifier = Modifier.weight(1f))
+                    Icon(
+                        FeatherIcons.ChevronDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        tint = accentColor.copy(alpha = 0.7f),
+                        modifier = Modifier.size(14.dp).rotate(animateFloatAsState(if (expanded) 180f else 0f, label = "chevron").value),
+                    )
+                }
+            }
+
+            // ── Timeline body ──
+            AnimatedVisibility(visible = expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, top = 6.dp, bottom = 12.dp, end = 12.dp)
+                        .drawBehind {
+                            // Continuous vertical line — node column is 16dp wide,
+                            // line passes through its center at 8dp from this Box's origin.
+                            val lineX = 8.dp.toPx()
+                            drawLine(
+                                color = accentColor.copy(alpha = 0.2f),
+                                start = Offset(lineX, 0f),
+                                end = Offset(lineX, size.height),
+                                strokeWidth = 1.5.dp.toPx(),
+                            )
+                        }
+                        .drawBehind {
+                            // Subtle gradient fade at the bottom of the timeline
+                            val fadeStart = (size.height - 24.dp.toPx()).coerceAtLeast(0f)
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, accentColor.copy(alpha = 0.04f)),
+                                    startY = fadeStart,
+                                    endY = size.height,
+                                )
+                            )
+                        }
+                ) {
+                    Column {
+                        items.forEachIndexed { idx, item ->
+                            TimelineRow(
+                                item = item,
+                                accentColor = accentColor,
+                                isFirst = idx == 0,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Single timeline row: node (dot/icon) + content ──
+
+@Composable
+private fun TimelineRow(
+    item: MessageSegment,
+    accentColor: Color,
+    isFirst: Boolean,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = if (isFirst) 0.dp else 4.dp),
+    ) {
+        // ── Node column: fixed 16dp wide, content centered on the line ──
+        Box(
+            modifier = Modifier.width(16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (item) {
+                is MessageSegment.Text -> {
+                    // Ring-style dot: 8dp circle, 1.5dp border, subtle fill
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .border(1.5.dp, accentColor.copy(alpha = 0.4f), CircleShape)
+                            .background(accentColor.copy(alpha = 0.08f), CircleShape),
+                    )
+                }
+                is MessageSegment.ToolCall -> {
+                    Icon(
+                        imageVector = iconForTool(item.info.name),
+                        contentDescription = null,
+                        tint = colorScheme.tertiary.copy(alpha = 0.75f),
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                is MessageSegment.ProblemCard -> { /* rendered outside timeline */ }
+                is MessageSegment.AskUser -> { /* rendered as AskUserCard in ChatScreen */ }
+            }
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        // ── Content ──
+        when (item) {
+            is MessageSegment.Text -> {
+                // Plain text — thinking content is not markdown
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                    ),
+                    color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    modifier = Modifier.weight(1f).padding(vertical = 1.dp),
+                )
+            }
+            is MessageSegment.ToolCall -> {
+                ToolCallTimelineNode(
+                    toolCall = item.info,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            is MessageSegment.ProblemCard -> { /* rendered outside timeline */ }
+            is MessageSegment.AskUser -> { /* rendered as AskUserCard in ChatScreen */ }
+        }
+    }
+}
+
+// ── Tool call node in timeline ──
+
+@Composable
+private fun ToolCallTimelineNode(
+    toolCall: ToolCallInfo,
+    modifier: Modifier = Modifier,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    var showResult by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier.clickable { showResult = !showResult }.padding(vertical = 1.dp),
+    ) {
+        ToolCallDescriber.Describe(toolCall)
+
+        if (showResult) {
+            Text(
+                text = toolCall.result ?: "(no result)",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        }
+    }
+}
+
+// ── Tool call → FeatherIcon mapping ──
+
+private fun iconForTool(functionName: String) = when {
+    "search" in functionName -> FeatherIcons.Search
+    "problem" in functionName -> FeatherIcons.FileText
+    "solutions" in functionName -> FeatherIcons.BookOpen
+    "training" in functionName -> FeatherIcons.List
+    "record" in functionName -> FeatherIcons.Clipboard
+    "practice" in functionName -> FeatherIcons.CheckCircle
+    "filters" in functionName -> FeatherIcons.Filter
+    else -> FeatherIcons.Code
+}

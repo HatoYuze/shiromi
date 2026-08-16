@@ -1,0 +1,40 @@
+# Build output
+/build/
+**/build/
+/.gradle/
+**/.gradle/
+/.gradle-home/
+/.kotlin/
+/out/
+
+# IDE
+/.idea/
+*.iml
+*.iws
+*.ipr
+.claude/
+.zcode/
+
+# OS generated
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Runtime artifacts (config with credentials, local DB, image cache)
+/config/
+**/config/*.toml
+chat.db
+dat/
+*.prompt
+
+# Misc downloads
+*.html
+*.url
+
+/local.properties
+
+# Local sandbox
+/run/
+/debug-sandbox
+/temp/
