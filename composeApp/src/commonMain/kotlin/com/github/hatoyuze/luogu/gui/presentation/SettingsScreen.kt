@@ -37,14 +37,19 @@ import com.github.hatoyuze.luogu.gui.data.log.LogLevel
 import com.github.hatoyuze.luogu.gui.data.local.GlobalCacheStats
 import com.github.hatoyuze.luogu.gui.data.local.LuoguCacheManager
 import com.github.hatoyuze.luogu.gui.domain.chat.ChatService
+import com.github.hatoyuze.luogu.gui.platform.ioDispatcher
 import com.github.hatoyuze.luogu.gui.platform.openDirectory
 import io.github.hatoyuze.deepseek.protocol.api.entity.ReasoningEffort
 import io.github.hatoyuze.deepseek.protocol.api.entity.ThinkingMode
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 import com.github.hatoyuze.luogu.gui.presentation.utils.toFixed
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.RefreshCw
 
 private val EFFORT_OPTIONS = listOf("AUTO", "HIGH", "MAX")
 
@@ -79,6 +84,7 @@ fun SettingsScreen(
     var luoguCookie by remember { mutableStateOf(ConfigService.luoguCookie) }
     var cookieVisible by remember { mutableStateOf(false) }
     var luoguUid by remember { mutableStateOf(ConfigService.luoguUid) }
+    var showLoginDialog by remember { mutableStateOf(false) }
     var chatPrompt by remember { mutableStateOf(ConfigService.chatPrompt) }
     var coachPrompt by remember { mutableStateOf(ConfigService.coachPrompt) }
     var showLogs by remember { mutableStateOf(false) }
@@ -107,87 +113,169 @@ fun SettingsScreen(
         return
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-            Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val compact = maxWidth < 600.dp
+
+        // ── 设置正文分组（桌面/移动共用；移动端额外带「查看日志」入口）──
+        val sections: @Composable () -> Unit = {
+            Spacer(Modifier.height(24.dp))
+
+            // ═══ DeepSeek API ═══
+            SectionHeader("DeepSeek API")
+
+            SensitiveEditRow(
+                label = "API Key", hint = "Your DeepSeek API key",
+                value = apiKey, onValueChange = { apiKey = it },
+                visible = apiKeyVisible, onToggleVisibility = { apiKeyVisible = !apiKeyVisible },
+                placeholder = "sk-...",
+            )
+
+            DropdownSettingRow(
+                "Model", "DeepSeek model", model,
+                if (apiKey.isBlank()) listOf("deepseek-v4-flash", "deepseek-v4-pro") else emptyList(),
+                { model = it },
+                if (apiKey.isNotBlank()) suspend { chatService.availableModels() } else null,
+            )
+
+            EditSettingRow("Max Tokens", "Maximum tokens per response, negative numbers indicate no limit.", maxTokens, { maxTokens = it })
+            EditSettingRow("Temperature", "Sampling randomness (0.0–2.0)", temperature, { temperature = it })
+            EditSettingRow("Top P", "Nucleus sampling threshold (0.0–1.0)", topP, { topP = it }, "e.g. 0.9")
+
+            val effortHints = mapOf("AUTO" to "Default", "HIGH" to "ReasoningEffort.HIGH", "MAX" to "Max depth")
+            DropdownSettingRow(
+                "Reasoning Effort", effortHints[EFFORT_OPTIONS[reasoningEffort]] ?: "",
+                EFFORT_OPTIONS[reasoningEffort], EFFORT_OPTIONS,
+                { reasoningEffort = EFFORT_OPTIONS.indexOf(it) },
+            )
+
+            EditSettingRow("Max Tool Iterations", "Max tool-call loops per request", maxToolIterations, { maxToolIterations = it })
+
+            Spacer(Modifier.height(24.dp))
+
+            // ═══ Luogu API ═══
+            SectionHeader("Luogu API")
+            SensitiveEditRow("Cookie", "Luogu login cookie", luoguCookie, { luoguCookie = it },
+                cookieVisible, { cookieVisible = !cookieVisible }, "_uid=...")
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = { showLoginDialog = true }) { Text("浏览器登录") }
+                Text(
+                    "在应用内打开洛谷登录页，登录后自动导入 Cookie",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            EditSettingRow("UID", "Your Luogu user ID", luoguUid, { luoguUid = it })
+
+            Spacer(Modifier.height(24.dp))
+
+            SectionHeader("Prompts")
+            ExpandablePromptRow("Chat Prompt", chatPrompt, { chatPrompt = it }, "System prompt for chat mode")
+            ExpandablePromptRow("Coach Prompt", coachPrompt, { coachPrompt = it }, "System prompt for coach mode")
+
+            Spacer(Modifier.height(24.dp))
+            SectionHeader("📦 洛谷缓存")
+            val cacheManager = org.koin.compose.koinInject<LuoguCacheManager>()
+            var cacheStats by remember { mutableStateOf<GlobalCacheStats?>(null) }
+
+            LaunchedEffect(Unit) {
+                cacheStats = cacheManager.getGlobalStats()
+            }
+
+            if (cacheStats != null) {
+                SettingRow("缓存条目", "${cacheStats!!.totalCount}", "")
+                SettingRow("缓存大小", formatBytes(cacheStats!!.totalSizeBytes), "")
+            } else {
+                SettingRow("缓存状态", "加载中...", "")
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { showLogs = true }) { Text("View Logs") }
-                OutlinedButton(onClick = { save() }) { Text("Save") }
-                TextButton(onClick = onBack) { Text("← Back") }
+                OutlinedButton(onClick = {
+                    scope.launch {
+                        cacheManager.clearAll()
+                        cacheStats = cacheManager.getGlobalStats()
+                    }
+                }) { Text("清除全部缓存") }
+            }
+
+            // ═══ 诊断（仅移动端）：查看日志入口 ═══
+            if (compact) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader("诊断")
+                Surface(
+                    Modifier.fillMaxWidth().clickable { showLogs = true },
+                    RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("查看日志", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(24.dp))
 
-        // ═══ DeepSeek API ═══
-        SectionHeader("DeepSeek API")
-
-        SensitiveEditRow(
-            label = "API Key", hint = "Your DeepSeek API key",
-            value = apiKey, onValueChange = { apiKey = it },
-            visible = apiKeyVisible, onToggleVisibility = { apiKeyVisible = !apiKeyVisible },
-            placeholder = "sk-...",
-        )
-
-        DropdownSettingRow(
-            "Model", "DeepSeek model", model,
-            if (apiKey.isBlank()) listOf("deepseek-v4-flash", "deepseek-v4-pro") else emptyList(),
-            { model = it },
-            if (apiKey.isNotBlank()) suspend { chatService.availableModels() } else null,
-        )
-
-        EditSettingRow("Max Tokens", "Maximum tokens per response, negative numbers indicate no limit.", maxTokens, { maxTokens = it })
-        EditSettingRow("Temperature", "Sampling randomness (0.0–2.0)", temperature, { temperature = it })
-        EditSettingRow("Top P", "Nucleus sampling threshold (0.0–1.0)", topP, { topP = it }, "e.g. 0.9")
-
-        val effortHints = mapOf("AUTO" to "Default", "HIGH" to "ReasoningEffort.HIGH", "MAX" to "Max depth")
-        DropdownSettingRow(
-            "Reasoning Effort", effortHints[EFFORT_OPTIONS[reasoningEffort]] ?: "",
-            EFFORT_OPTIONS[reasoningEffort], EFFORT_OPTIONS,
-            { reasoningEffort = EFFORT_OPTIONS.indexOf(it) },
-        )
-
-        EditSettingRow("Max Tool Iterations", "Max tool-call loops per request", maxToolIterations, { maxToolIterations = it })
-
-        Spacer(Modifier.height(24.dp))
-
-        // ═══ Luogu API ═══
-        SectionHeader("Luogu API")
-        SensitiveEditRow("Cookie", "Luogu login cookie", luoguCookie, { luoguCookie = it },
-            cookieVisible, { cookieVisible = !cookieVisible }, "_uid=...")
-        EditSettingRow("UID", "Your Luogu user ID", luoguUid, { luoguUid = it })
-
-        Spacer(Modifier.height(24.dp))
-
-        SectionHeader("Prompts")
-        ExpandablePromptRow("Chat Prompt", chatPrompt, { chatPrompt = it }, "System prompt for chat mode")
-        ExpandablePromptRow("Coach Prompt", coachPrompt, { coachPrompt = it }, "System prompt for coach mode")
-
-        Spacer(Modifier.height(24.dp))
-        SectionHeader("📦 洛谷缓存")
-        val cacheManager = org.koin.compose.koinInject<LuoguCacheManager>()
-        var cacheStats by remember { mutableStateOf<GlobalCacheStats?>(null) }
-
-        LaunchedEffect(Unit) {
-            cacheStats = cacheManager.getGlobalStats()
-        }
-
-        if (cacheStats != null) {
-            SettingRow("缓存条目", "${cacheStats!!.totalCount}", "")
-            SettingRow("缓存大小", formatBytes(cacheStats!!.totalSizeBytes), "")
-        } else {
-            SettingRow("缓存状态", "加载中...", "")
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = {
-                scope.launch {
-                    cacheManager.clearAll()
-                    cacheStats = cacheManager.getGlobalStats()
+        if (compact) {
+            // ── 移动端：仅标题 + 可滚动正文 + 底部保存按钮（无返回栏）──
+            Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp)) {
+                    Text("设置", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 }
-            }) { Text("清除全部缓存") }
+                HorizontalDivider()
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp),
+                ) {
+                    sections()
+                }
+                Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
+                    Button(
+                        onClick = { save() },
+                        modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text("保存设置", fontSize = 15.sp)
+                    }
+                }
+            }
+        } else {
+            // ── 桌面：原有布局保持不变 ──
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                    Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { showLogs = true }) { Text("View Logs") }
+                        OutlinedButton(onClick = { save() }) { Text("Save") }
+                        TextButton(onClick = onBack) { Text("← Back") }
+                    }
+                }
+                sections()
+            }
         }
+    }
+
+    if (showLoginDialog) {
+        com.github.hatoyuze.luogu.gui.presentation.login.LuoguLoginDialog(
+            onDismiss = { showLoginDialog = false },
+            onSuccess = { session ->
+                showLoginDialog = false
+                luoguCookie = session.cookieString
+                session.uid?.takeIf { it > 0 }?.toString()?.let { luoguUid = it }
+                save()
+            },
+        )
     }
 }
 
@@ -197,41 +285,134 @@ fun SettingsScreen(
 private fun LogViewer(onBack: () -> Unit) {
     var refreshKey by remember { mutableIntStateOf(0) }
     var category by remember { mutableStateOf<LogCategory?>(null) }
-    val logs = remember(refreshKey, category) { Logger.recent(500, category = category) }
+    var logs by remember { mutableStateOf<List<LogEntryData>?>(null) }
     var selectedLog by remember { mutableStateOf<LogEntryData?>(null) }
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-            Text("Logs", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { refreshKey++ }) { Text("Refresh") }
-                OutlinedButton(onClick = { Logger.clearAll(); refreshKey++ }) { Text("Clear All") }
-                OutlinedButton(onClick = { openDirectory(Logger.logLocation) }) { Text("打开日志目录") }
-                TextButton(onClick = onBack) { Text("← Back") }
-            }
-        }
-        Text(
-            "日志目录: ${Logger.logLocation}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = category == null, onClick = { category = null }, label = { Text("全部") })
-            LogCategory.entries.forEach { cat ->
-                FilterChip(selected = category == cat, onClick = { category = cat }, label = { Text(cat.name) })
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        if (logs.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No logs yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // 后台线程读取/解析日志，避免阻塞 UI 线程（移动端首次打开时尤其明显）
+    LaunchedEffect(refreshKey, category) {
+        logs = withContext(ioDispatcher) { Logger.recent(500, category = category) }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val compact = maxWidth < 600.dp
+
+        if (compact) {
+            // ── 移动端：顶栏（返回 + 标题 + 刷新）+ 操作行 + 过滤 + 列表 ──
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                    }
+                    Text(
+                        "日志",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { refreshKey++ }) {
+                        Icon(FeatherIcons.RefreshCw, contentDescription = "刷新")
+                    }
+                }
+                HorizontalDivider()
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { Logger.clearAll(); refreshKey++ },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("清空全部") }
+                    OutlinedButton(
+                        onClick = { openDirectory(Logger.logLocation) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("打开日志目录") }
+                }
+                Text(
+                    "日志目录: ${Logger.logLocation}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = category == null, onClick = { category = null }, label = { Text("全部") })
+                    LogCategory.entries.forEach { cat ->
+                        FilterChip(selected = category == cat, onClick = { category = cat }, label = { Text(cat.name) })
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                LogListContent(
+                    logs = logs,
+                    onSelect = { selectedLog = it },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
             }
         } else {
-            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items(logs) { entry ->
+            // ── 桌面：原有布局保持不变 ──
+            Column(Modifier.fillMaxSize().padding(24.dp)) {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                    Text("Logs", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { refreshKey++ }) { Text("Refresh") }
+                        OutlinedButton(onClick = { Logger.clearAll(); refreshKey++ }) { Text("Clear All") }
+                        OutlinedButton(onClick = { openDirectory(Logger.logLocation) }) { Text("打开日志目录") }
+                        TextButton(onClick = onBack) { Text("← Back") }
+                    }
+                }
+                Text(
+                    "日志目录: ${Logger.logLocation}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = category == null, onClick = { category = null }, label = { Text("全部") })
+                    LogCategory.entries.forEach { cat ->
+                        FilterChip(selected = category == cat, onClick = { category = cat }, label = { Text(cat.name) })
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                LogListContent(
+                    logs = logs,
+                    onSelect = { selectedLog = it },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
+        }
+    }
+
+    selectedLog?.let { log ->
+        LogDetailDialog(log = log, onDismiss = { selectedLog = null })
+    }
+}
+
+/** 日志列表（加载中 / 空 / 列表三态），数据由 [LogViewer] 在后台线程加载。 */
+@Composable
+private fun LogListContent(
+    logs: List<LogEntryData>?,
+    onSelect: (LogEntryData) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val currentLogs = logs ?: emptyList()
+    when {
+        logs == null -> {
+            Box(modifier, contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            }
+        }
+        currentLogs.isEmpty() -> {
+            Box(modifier, contentAlignment = Alignment.Center) {
+                Text("No logs yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        else -> {
+            LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                items(currentLogs) { entry ->
                     Surface(
-                        onClick = { selectedLog = entry },
+                        onClick = { onSelect(entry) },
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(6.dp),
                         color = if (entry.category == LogCategory.HTTP) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -255,10 +436,6 @@ private fun LogViewer(onBack: () -> Unit) {
                 }
             }
         }
-    }
-
-    selectedLog?.let { log ->
-        LogDetailDialog(log = log, onDismiss = { selectedLog = null })
     }
 }
 
