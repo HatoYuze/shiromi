@@ -68,6 +68,13 @@ kompressor-core = { module = "com.ensody.kompressor:kompressor-core" }
 kompressor-zstd-nativelib = { module = "com.ensody.kompressor:kompressor-zstd--nativelib" }
 zstd-libzstd = { module = "com.ensody.nativebuilds:zstd-libzstd", version.ref = "zstdNative" }
 
+# Vendored wvbridge fork (lib/wvbridge, composite build). Versions are placeholders:
+# includeBuild substitutes these coordinates with the local fork projects.
+wvbridge-core = { module = "top.kagg886.wvbridge:core", version = "0.0.6" }
+wvbridge-platform-windows = { module = "top.kagg886.wvbridge:platform-windows", version = "0.0.5" }
+wvbridge-platform-macos = { module = "top.kagg886.wvbridge:platform-macos", version = "0.0.5" }
+wvbridge-platform-linux = { module = "top.kagg886.wvbridge:platform-linux", version = "0.0.5" }
+
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

@@ -94,6 +94,9 @@ kotlin {
             api(project.dependencies.platform("com.ensody.kompressor:kompressor-bom:${libs.versions.kompressor.get()}"))
             implementation(libs.kompressor.core)
             implementation(libs.kompressor.zstd.nativelib)
+
+            // Embedded browser (wvbridge fork) for the in-app Luogu login
+            implementation(libs.wvbridge.core)
         }
 
         jvmMain.dependencies {
@@ -112,6 +115,19 @@ kotlin {
 
             // RaTeX native for Windows
             runtimeOnly(libs.ratex.native.windows)
+
+            // wvbridge desktop backend (per-OS native engine)
+            implementation(
+                when {
+                    System.getProperty("os.name").startsWith("Windows") -> libs.wvbridge.platform.windows
+                    System.getProperty("os.name").startsWith("Linux") -> libs.wvbridge.platform.linux
+                    System.getProperty("os.name").startsWith("Mac") && System.getProperty("os.arch") in setOf("aarch64", "arm64") -> libs.wvbridge.platform.macos
+                    else -> error(
+                        "Unsupported desktop runtime for wvbridge: " +
+                            "${System.getProperty("os.name")} ${System.getProperty("os.arch")}",
+                    )
+                },
+            )
         }
 
         androidMain.dependencies {

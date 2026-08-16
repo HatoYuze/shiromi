@@ -4,8 +4,10 @@
 /.gradle/
 **/.gradle/
 /.gradle-home/
+/.gradle-agent-cache/
 /.kotlin/
 /out/
+/.scratch/
 
 # IDE
 /.idea/
@@ -27,6 +29,9 @@ Thumbs.db
 chat.db
 dat/
 *.prompt
+
+# HAR captures may contain session cookies / login bodies — never commit
+*.har
 
 # Misc downloads
 *.html

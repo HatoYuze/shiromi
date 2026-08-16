@@ -1,0 +1,252 @@
+name: release.yaml
+on:
+  workflow_dispatch:
+    inputs:
+      RELEASE_LIB_CORE:
+        description: 'Release Core Library'
+        required: false
+        default: false
+        type: boolean
+      RELEASE_LIB_JSBRIDGE:
+        description: 'Release JavaScript Bridge Helper Library'
+        required: false
+        default: false
+        type: boolean
+      RELEASE_LIB_PLATFORM_WINDOWS:
+        description: 'Release JVM Windows Platform'
+        required: false
+        default: false
+        type: boolean
+      RELEASE_LIB_PLATFORM_LINUX:
+        description: 'Release JVM Linux Platform'
+        required: false
+        default: false
+        type: boolean
+      RELEASE_LIB_PLATFORM_MACOS:
+        description: 'Release JVM macOS Platform'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  test-jvm-windows:
+    if: ${{ inputs.RELEASE_LIB_PLATFORM_WINDOWS || inputs.RELEASE_LIB_CORE || inputs.RELEASE_LIB_JSBRIDGE }}
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+        with:
+          windows: 'true'
+
+      - name: Run Test
+        uses: ./.github/actions/test-jvm
+
+  test-jvm-linux:
+    if: ${{ inputs.RELEASE_LIB_PLATFORM_LINUX || inputs.RELEASE_LIB_CORE || inputs.RELEASE_LIB_JSBRIDGE }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+        with:
+          linux: 'true'
+
+      - name: Run Test
+        uses: ./.github/actions/test-jvm
+
+  test-jvm-macos:
+    if: ${{ inputs.RELEASE_LIB_PLATFORM_MACOS || inputs.RELEASE_LIB_CORE || inputs.RELEASE_LIB_JSBRIDGE }}
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+
+      - name: Run Test
+        uses: ./.github/actions/test-jvm
+
+  test-android:
+    if: ${{ inputs.RELEASE_LIB_CORE || inputs.RELEASE_LIB_JSBRIDGE }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+
+      - name: Run Test
+        uses: ./.github/actions/test-android
+
+  test-ios:
+    if: ${{ inputs.RELEASE_LIB_CORE || inputs.RELEASE_LIB_JSBRIDGE }}
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+
+      - name: Run Test
+        uses: ./.github/actions/test-ios
+
+  release-core:
+    if: ${{ inputs.RELEASE_LIB_CORE }}
+    needs:
+      - test-jvm-windows
+      - test-jvm-linux
+      - test-jvm-macos
+      - test-android
+      - test-ios
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+
+      - name: Read Core Version
+        id: core-version
+        shell: bash
+        run: |
+          version="$(sed -n 's/^LIB_CORE_VERSION=//p' gradle.properties)"
+          if [[ -z "$version" ]]; then
+            echo "LIB_CORE_VERSION is not set in gradle.properties" >&2
+            exit 1
+          fi
+          version="${version#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        run: ./gradlew :core:publishAndReleaseToMavenCentral
+        env:
+          org.gradle.configuration-cache: false
+          SKIP_SIGN: false
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALPASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_SECRETKEYRING }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.core-version.outputs.version }}
+        run: gh release create "$VERSION" --target "$GITHUB_SHA" --title "Core $VERSION" --generate-notes
+
+  release-jsbridge:
+    if: ${{ inputs.RELEASE_LIB_JSBRIDGE }}
+    needs:
+      - release-core
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+
+      - name: Publish
+        run: ./gradlew :jsbridge:publishAndReleaseToMavenCentral
+        env:
+          org.gradle.configuration-cache: false
+          SKIP_SIGN: false
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALPASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_SECRETKEYRING }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+
+  release-platform-jvm-windows:
+    if: ${{ inputs.RELEASE_LIB_PLATFORM_WINDOWS }}
+    needs:
+      - test-jvm-windows
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+        with:
+          windows: 'true'
+
+      - name: Publish
+        run: ./gradlew :platform:platform-windows:publishAndReleaseToMavenCentral
+        env:
+          org.gradle.configuration-cache: false
+          SKIP_SIGN: false
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALPASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_SECRETKEYRING }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+
+  release-platform-jvm-linux:
+    if: ${{ inputs.RELEASE_LIB_PLATFORM_LINUX }}
+    needs:
+      - test-jvm-linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+        with:
+          linux: 'true'
+
+      - name: Publish
+        run: ./gradlew :platform:platform-linux:publishAndReleaseToMavenCentral
+        env:
+          org.gradle.configuration-cache: false
+          SKIP_SIGN: false
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALPASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_SECRETKEYRING }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+
+  release-platform-jvm-macos:
+    if: ${{ inputs.RELEASE_LIB_PLATFORM_MACOS }}
+    needs:
+      - test-jvm-macos
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-base
+
+      - name: Publish
+        run: ./gradlew :platform:platform-macos:publishAndReleaseToMavenCentral
+        env:
+          org.gradle.configuration-cache: false
+          SKIP_SIGN: false
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALPASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_SECRETKEYRING }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}

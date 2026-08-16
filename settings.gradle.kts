@@ -29,3 +29,8 @@ dependencyResolutionManagement {
 
 include(":composeApp")
 include(":lib:luogu-protocol")
+
+// Vendored wvbridge fork (lib/wvbridge) — adds native cookie access for the
+// embedded Luogu login WebView. Composite build substitutes the
+// top.kagg886.wvbridge:* coordinates declared in gradle/libs.versions.toml.
+includeBuild("lib/wvbridge")
