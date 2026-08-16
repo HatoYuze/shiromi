@@ -1,6 +1,5 @@
 package com.github.hatoyuze.luogu.gui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.text.TextStyle
@@ -10,7 +9,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-internal val LocalThemeIsDark = compositionLocalOf { mutableStateOf(true) }
+internal val LocalThemeIsDark = compositionLocalOf { mutableStateOf(false) }
 
 private val DarkColors = darkColorScheme(
     primary = PrimaryDark,
@@ -48,9 +47,19 @@ private val LightColors = lightColorScheme(
     outline = OutlineLight,
 )
 
+/**
+ * 全平台统一主题。
+ *
+ * 默认固定为浅色（[LightColors]）：桌面 JVM 上 `isSystemInDarkTheme()` 无法可靠获取
+ * 系统深色模式（当前版本恒为 false），移动端此前却跟随系统深色模式，导致与桌面配色
+ * 不一致；现所有平台默认同一套「图书馆」浅色方案，深色仅由界面上的 🌙/☀️ 手动切换
+ * （见 ChatScreen / ChatScreenMobile）。
+ *
+ * @param darkTheme 是否使用深色方案，默认 false（浅色）。
+ */
 @Composable
 fun LuoguTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isDark = remember { mutableStateOf(darkTheme) }
