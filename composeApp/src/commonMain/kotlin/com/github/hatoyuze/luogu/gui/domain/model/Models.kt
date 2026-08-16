@@ -143,6 +143,7 @@ data class TodoItemDomainModel(
     val title: String,
     val completed: Boolean,
     val createdAt: Long,
+    val dueAt: Long? = null,
 )
 
 // ═══════════════════════════════════════════════════════════
@@ -157,6 +158,8 @@ data class CalendarEvent(
     val createdAtMs: Long,
     val color: Int = 0,  // ARGB int; 0 = default (no custom color)
     val pinned: Boolean = false,
+    val allDay: Boolean = false,  // 全天事件（不显示具体时间）
+    val timeMinutes: Int? = null, // 0..1439，分钟数；null = 未指定
 )
 
 /** Current study topic with goal tracking. */

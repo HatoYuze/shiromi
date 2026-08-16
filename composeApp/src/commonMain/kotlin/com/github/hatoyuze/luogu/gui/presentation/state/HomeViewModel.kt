@@ -45,6 +45,9 @@ private val ENCOURAGEMENTS = listOf(
     "好记性不如烂笔头", "静下心来，专注当下", "学如逆水行舟",
 )
 
+/** 一周毫秒数：用于「本周 +N」解题统计（滚动 7 天）。 */
+private const val WEEK_MILLIS = 7L * 24 * 60 * 60 * 1000
+
 // ═══════════════════════════════════════════════════════════
 // HomeViewModel
 // ═══════════════════════════════════════════════════════════
@@ -71,6 +74,8 @@ class HomeViewModel(
         // Learning progress
         val streakDays: Int = 0,
         val studyTopic: StudyTopic = StudyTopic(),
+        val solvedTotal: Long = 0,      // 累计已解题数（CompletedProblem）
+        val solvedThisWeek: Long = 0,   // 近 7 天已解题数
 
         // Calendar events (non-expired only, pinned first)
         val calendarEvents: List<CalendarEvent> = emptyList(),
@@ -128,6 +133,8 @@ class HomeViewModel(
                     activeDates = computeActiveDates(sessions, todos, prevState.calendarEvents),
                     streakDays = computeStreak(sessions, todos, currentToday),
                     studyTopic = topic,
+                    solvedTotal = prevState.solvedTotal,
+                    solvedThisWeek = prevState.solvedThisWeek,
                     calendarEvents = prevState.calendarEvents,
                     calendarViewState = prevState.calendarViewState,
                     selectedDateItems = prevState.selectedDateItems,
@@ -136,6 +143,22 @@ class HomeViewModel(
                     encouragementText = if (dailyKey != todayKey) ENCOURAGEMENTS.random() else prevState.encouragementText,
                 )
             }.distinctUntilChanged().collect { _state.value = it }
+        }
+
+        // 解题统计（独立收集器）：以 CompletedProblem 表变化为触发（防抖重算），
+        // DB 异常降级为 0，不阻塞也不杀死主 state 流
+        viewModelScope.launch {
+            repository.getCompletedProblemChanges()
+                .onStart { emit(Unit) }
+                .debounce(500)
+                .collect {
+                    val now = com.github.hatoyuze.luogu.gui.platform.currentTimeMillis()
+                    val total = runCatching { repository.countAllCompletedProblems() }.getOrDefault(0L)
+                    val week = runCatching {
+                        repository.countCompletedProblemsSince(now - WEEK_MILLIS)
+                    }.getOrDefault(0L)
+                    _state.update { it.copy(solvedTotal = total, solvedThisWeek = week) }
+                }
         }
 
         // Active calendar events: non-expired only, re-queries when today changes
@@ -230,7 +253,14 @@ class HomeViewModel(
     // Calendar event actions
     // ══════════════════════════════════════════════════════
 
-    fun addCalendarEvent(name: String, date: LocalDate, color: Int = 0, pinned: Boolean = false) {
+    fun addCalendarEvent(
+        name: String,
+        date: LocalDate,
+        color: Int = 0,
+        pinned: Boolean = false,
+        allDay: Boolean = false,
+        timeMinutes: Int? = null,
+    ) {
         viewModelScope.launch {
             repository.insertCalendarEvent(
                 CalendarEvent(
@@ -240,6 +270,8 @@ class HomeViewModel(
                     createdAtMs = currentTimeMillis(),
                     color = color,
                     pinned = pinned,
+                    allDay = allDay,
+                    timeMinutes = timeMinutes,
                 )
             )
         }
@@ -289,13 +321,14 @@ class HomeViewModel(
     // Todo actions (existing)
     // ══════════════════════════════════════════════════════
 
-    fun addTodo(title: String) {
+    fun addTodo(title: String, dueAt: Long? = null) {
         viewModelScope.launch {
             val todo = TodoItemDomainModel(
                 id = "${currentTimeMillis()}",
                 title = title,
                 completed = false,
                 createdAt = currentTimeMillis(),
+                dueAt = dueAt,
             )
             repository.insertTodo(todo)
         }

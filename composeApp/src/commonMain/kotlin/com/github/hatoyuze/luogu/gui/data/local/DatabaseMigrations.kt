@@ -32,5 +32,18 @@ internal object DatabaseMigrations {
             """,
             0,
         )
+
+        // Migration: TodoItem.dueAt (nullable epoch millis)
+        runCatching {
+            driver.execute(-1, "ALTER TABLE TodoItem ADD COLUMN dueAt INTEGER", 0)
+        }
+
+        // Migration: CalendarEventEntity time fields (all-day flag + minutes since midnight)
+        runCatching {
+            driver.execute(-1, "ALTER TABLE CalendarEventEntity ADD COLUMN all_day INTEGER NOT NULL DEFAULT 0", 0)
+        }
+        runCatching {
+            driver.execute(-1, "ALTER TABLE CalendarEventEntity ADD COLUMN time_minutes INTEGER", 0)
+        }
     }
 }

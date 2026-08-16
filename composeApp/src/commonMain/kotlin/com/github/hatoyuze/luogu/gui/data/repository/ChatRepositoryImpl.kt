@@ -194,6 +194,7 @@ class ChatRepositoryImpl(
                 title = todo.title,
                 completed = if (todo.completed) 1L else 0L,
                 createdAt = todo.createdAt,
+                dueAt = todo.dueAt,
             )
         }
     }
@@ -249,6 +250,8 @@ class ChatRepositoryImpl(
                 created_at_ms = event.createdAtMs,
                 color = event.color.toLong(),
                 pinned = if (event.pinned) 1L else 0L,
+                all_day = if (event.allDay) 1L else 0L,
+                time_minutes = event.timeMinutes?.toLong(),
             )
         }
     }
@@ -286,6 +289,20 @@ class ChatRepositoryImpl(
             )
         }
     }
+
+    // ── Solved-problem stats ──
+
+    override fun getCompletedProblemChanges(): Flow<Unit> =
+        queries.selectAllCompletedProblems().asFlow().map { }
+
+    override suspend fun countAllCompletedProblems(): Long = withContext(Dispatchers.Default) {
+        queries.countAllCompletedProblems().executeAsOne()
+    }
+
+    override suspend fun countCompletedProblemsSince(fromEpochMillis: Long): Long =
+        withContext(Dispatchers.Default) {
+            queries.countCompletedProblemsSince(fromEpochMillis).executeAsOne()
+        }
 
     // ── Daily Problem ──
 
@@ -418,6 +435,7 @@ private fun TodoItem.toDomainModel(): TodoItemDomainModel = TodoItemDomainModel(
     title = title,
     completed = completed == 1L,
     createdAt = createdAt,
+    dueAt = dueAt,
 )
 
 // ── CalendarEventEntity <-> CalendarEvent ──
@@ -429,6 +447,8 @@ private fun CalendarEventEntity.toDomain(): CalendarEvent = CalendarEvent(
     createdAtMs = created_at_ms,
     color = color.toInt(),
     pinned = pinned == 1L,
+    allDay = all_day == 1L,
+    timeMinutes = time_minutes?.toInt(),
 )
 
 // ── StudyTopicEntity <-> StudyTopic ──

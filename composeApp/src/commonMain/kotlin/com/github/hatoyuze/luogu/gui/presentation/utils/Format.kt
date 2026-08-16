@@ -3,9 +3,13 @@ package com.github.hatoyuze.luogu.gui.presentation.utils
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
- * 纯 Kotlin 数值格式化工具。
+ * 纯 Kotlin 数值/时间格式化工具。
  *
  * 替代 JVM 专属的 `String.format("%.1f")` 系列用法，
  * 保证 commonMain 在 Android / iOS 上同样可用。
@@ -57,3 +61,53 @@ fun formatMillis(ms: Long): String = if (ms >= 1000) (ms / 1000.0).toFixed(2) + 
 /** 带单位的兆字节。 */
 fun formatMegaBytes(mb: Double): String =
     if (mb == mb.roundToInt().toDouble()) "${mb.roundToInt()}MB" else mb.toFixed(2) + "MB"
+
+// ═══════════════════════════════════════════════════════════
+// 待办到期 / 事件时间（移动端卡片展示）
+// ═══════════════════════════════════════════════════════════
+
+private val WEEKDAY_CN = listOf("一", "二", "三", "四", "五", "六", "日")
+
+/**
+ * 待办相对到期文案。
+ *
+ * - 已完成 → 「已完成」
+ * - 到期日 = 今天 → 「今天 HH:mm」
+ * - 到期日 = 明天 → 「明天」
+ * - 2–6 天内 → 「周X」
+ * - 已逾期 → 「已逾期」
+ * - 其余 → 「M月D日」
+ * - [dueAt] 为 null → 空串（无期限）
+ *
+ * @param zone 时区（默认系统时区）；测试可传固定时区保证确定性。
+ */
+fun formatDue(
+    dueAt: Long?,
+    completed: Boolean,
+    now: Instant = Clock.System.now(),
+    zone: TimeZone = TimeZone.currentSystemDefault(),
+): String {
+    if (completed) return "已完成"
+    if (dueAt == null) return ""
+    val dueDt = Instant.fromEpochMilliseconds(dueAt).toLocalDateTime(zone)
+    val dueDate = dueDt.date
+    val today = now.toLocalDateTime(zone).date
+    val days = dueDate.toEpochDays() - today.toEpochDays()
+    val hhmm = "${dueDt.hour.toPad2()}:${dueDt.minute.toPad2()}"
+    return when {
+        days < 0L -> "已逾期"
+        days == 0L -> "今天 $hhmm"
+        days == 1L -> "明天"
+        days in 2L..6L -> "周${WEEKDAY_CN[dueDate.dayOfWeek.ordinal]}"
+        else -> "${dueDate.monthNumber}月${dueDate.day}日"
+    }
+}
+
+/**
+ * 事件时间展示：全天 → 「全天」；有分钟数 → 「HH:mm」；未指定 → 空串。
+ */
+fun formatEventTime(allDay: Boolean, timeMinutes: Int?): String = when {
+    allDay -> "全天"
+    timeMinutes != null -> "${(timeMinutes / 60).toPad2()}:${(timeMinutes % 60).toPad2()}"
+    else -> ""
+}

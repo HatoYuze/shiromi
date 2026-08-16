@@ -45,6 +45,12 @@ interface ChatRepository {
     fun getStudyTopic(): Flow<StudyTopic>
     suspend fun saveStudyTopic(topic: StudyTopic)
 
+    // Solved-problem stats (from CompletedProblem)
+    /** CompletedProblem 表变化信号（SQLDelight 表级失效），用于驱动统计重算。 */
+    fun getCompletedProblemChanges(): Flow<Unit>
+    suspend fun countAllCompletedProblems(): Long
+    suspend fun countCompletedProblemsSince(fromEpochMillis: Long): Long
+
     // Daily Problem — agent context + cache
     fun getDailyProblem(dateDays: Long): Flow<DailyProblemResult?>
     suspend fun saveDailyProblem(dateDays: Long, result: DailyProblemResult)

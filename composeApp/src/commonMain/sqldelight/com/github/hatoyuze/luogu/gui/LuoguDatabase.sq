@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS TodoItem (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
     completed INTEGER NOT NULL DEFAULT 0,
-    createdAt INTEGER NOT NULL
+    createdAt INTEGER NOT NULL,
+    dueAt INTEGER
 );
 
 -- ChatSession queries
@@ -103,8 +104,8 @@ selectAllTodos:
 SELECT * FROM TodoItem ORDER BY createdAt DESC;
 
 insertTodo:
-INSERT OR REPLACE INTO TodoItem(id, title, completed, createdAt)
-VALUES (?, ?, ?, ?);
+INSERT OR REPLACE INTO TodoItem(id, title, completed, createdAt, dueAt)
+VALUES (?, ?, ?, ?, ?);
 
 updateTodoCompleted:
 UPDATE TodoItem SET completed = ? WHERE id = ?;
@@ -159,6 +160,12 @@ CREATE TABLE IF NOT EXISTS CompletedProblem (
 selectAllCompletedProblems:
 SELECT pid FROM CompletedProblem;
 
+countAllCompletedProblems:
+SELECT COUNT(*) FROM CompletedProblem;
+
+countCompletedProblemsSince:
+SELECT COUNT(*) FROM CompletedProblem WHERE completedAt >= ?;
+
 insertCompletedProblem:
 INSERT OR REPLACE INTO CompletedProblem(pid, completedAt)
 VALUES (?, ?);
@@ -192,7 +199,9 @@ CREATE TABLE IF NOT EXISTS CalendarEventEntity (
     date_epoch_days INTEGER NOT NULL,      -- UTC+0 days since epoch
     created_at_ms INTEGER NOT NULL,        -- epoch millis
     color INTEGER NOT NULL DEFAULT 0,
-    pinned INTEGER NOT NULL DEFAULT 0      -- 0/1, pinned sorts first
+    pinned INTEGER NOT NULL DEFAULT 0,     -- 0/1, pinned sorts first
+    all_day INTEGER NOT NULL DEFAULT 0,    -- 0/1, all-day event
+    time_minutes INTEGER                   -- minutes since midnight, NULL = unspecified
 );
 
 -- Active events: all non-expired (date >= today), pinned first
@@ -202,8 +211,8 @@ WHERE date_epoch_days >= ?
 ORDER BY pinned DESC, date_epoch_days ASC;
 
 insertCalendarEvent:
-INSERT OR REPLACE INTO CalendarEventEntity (id, name, date_epoch_days, created_at_ms, color, pinned)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO CalendarEventEntity (id, name, date_epoch_days, created_at_ms, color, pinned, all_day, time_minutes)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteCalendarEvent:
 DELETE FROM CalendarEventEntity WHERE id = ?;
