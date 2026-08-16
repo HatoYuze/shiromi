@@ -2,6 +2,8 @@ package com.github.hatoyuze.luogu.gui.presentation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ColorScheme
@@ -299,9 +302,21 @@ internal fun ChatMessages(
     branches: List<ChatBranchDomainModel>,
     onEvent: (ChatEvent) -> Unit,
     alwaysShowActions: Boolean = false,
+    compact: Boolean = false,
 ) {
+    // 新消息到达 → 动画滚动到底
     LaunchedEffect(messages.size) {
-        state.animateScrollToItem(messages.size)
+        if (messages.isNotEmpty()) state.animateScrollToItem(messages.size - 1)
+    }
+
+    // 流式输出：最后一条消息内容持续增长（size 不变）→ 无动画贴底跟随，
+    // 解决 agent 更新信息时列表"悬停"不自动下拉的问题。
+    // 仅移动端（compact）启用，桌面保持原有"仅新消息滚动"行为。
+    if (compact) {
+        val lastMessage = messages.lastOrNull()
+        LaunchedEffect(lastMessage?.id, lastMessage?.content?.length) {
+            if (messages.isNotEmpty()) state.scrollToItem(messages.size - 1)
+        }
     }
 
     LazyColumn(
@@ -354,6 +369,7 @@ internal fun ChatMessages(
                         editingMessageId = editingMessageId,
                         onSendEdit = { id, content -> onEvent(ChatEvent.SendEdit(id, content)) },
                         onCancelEdit = { onEvent(ChatEvent.CancelEdit) },
+                        compact = compact,
                     )
                     MessageActionBar(
                         message = message,
@@ -361,6 +377,7 @@ internal fun ChatMessages(
                         isHovered = isHovered || alwaysShowActions,
                         canRegenerate = isLatestAssistant,
                         canDelete = !isFirstUserMessage,
+                        labeled = compact,
                         onEdit = { onEvent(ChatEvent.StartEdit(message.id)) },
                         onStop = { onEvent(ChatEvent.StopGeneration) },
                         onRegenerate = {
@@ -443,7 +460,8 @@ internal fun ChatMessages(
 fun ChatInput(
     onSendMessage: (String) -> Unit,
     enabled: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     var text by remember { mutableStateOf("") }
     var isFocused by remember { mutableStateOf(false) }
@@ -516,10 +534,10 @@ fun ChatInput(
                         alpha = 0.7f
                     )
                 ),
-                maxLines = 10,
+                maxLines = if (compact) 3 else 10,
                 placeholder = {
                     Text(
-                        "Type your message...",
+                        if (compact) "输入消息…" else "Type your message...",
                         style = MaterialTheme.typography.bodyLarge
                     )
                 },
@@ -528,7 +546,47 @@ fun ChatInput(
                 )
             )
 
-            if (text.isNotBlank()) {
+            if (compact) {
+                // 移动端：圆形发送按钮；有文字时变色（enabled 仅控制可点性），
+                // 加载中（disabled）用半透明主色，避免看似可点
+                val hasText = text.isNotBlank()
+                val canSend = enabled && hasText
+                val buttonColor = when {
+                    canSend -> MaterialTheme.colorScheme.primary
+                    hasText -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                }
+                val iconTint = when {
+                    canSend -> MaterialTheme.colorScheme.onPrimary
+                    hasText -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = buttonColor,
+                    modifier = Modifier.padding(end = 6.dp).size(38.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clickable(
+                                enabled = canSend,
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                onSendMessage(text)
+                                text = ""
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            FeatherIcons.Send,
+                            contentDescription = "发送",
+                            tint = iconTint,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            } else if (text.isNotBlank()) {
                 IconButton(
                     onClick = {
                         onSendMessage(text)

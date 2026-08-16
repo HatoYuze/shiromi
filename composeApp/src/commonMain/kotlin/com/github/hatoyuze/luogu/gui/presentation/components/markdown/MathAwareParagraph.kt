@@ -1,9 +1,14 @@
 package com.github.hatoyuze.luogu.gui.presentation.components.markdown
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +35,7 @@ import com.mikepenz.markdown.utils.codeSpanStyle
 import com.mikepenz.markdown.utils.linkTextSpanStyle
 import io.ratex.DisplayList
 import io.ratex.RaTeXEngine
+import io.ratex.measure
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -199,15 +205,40 @@ fun MathAwareParagraph(model: MarkdownComponentModel) {
                         }
                     }
 
-                    Column(Modifier.fillMaxWidth(),
-                           horizontalAlignment = Alignment.CenterHorizontally) {
-                        BaselineAlignedRaTeX(
-                            latex = formula,
-                            displayMode = true,
-                            fontSize = BLOCK_FONT_SIZE,
-                            color = themeColor,
-                            precomputedDisplayList = blockDl,
-                        )
+                    // 块级公式：能放下则居中显示，超宽则横向滚动，避免溢出聊天框
+                    val density = LocalDensity.current
+                    val blockFontPx = with(density) { BLOCK_FONT_SIZE.toPx() }
+                    val blockWidthPx = remember(blockDl, blockFontPx) {
+                        blockDl?.measure(blockFontPx)?.widthPx ?: 0f
+                    }
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val fits = with(LocalDensity.current) { blockWidthPx <= maxWidth.toPx() }
+                        if (fits) {
+                            Box(
+                                Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                BaselineAlignedRaTeX(
+                                    latex = formula,
+                                    displayMode = true,
+                                    fontSize = BLOCK_FONT_SIZE,
+                                    color = themeColor,
+                                    precomputedDisplayList = blockDl,
+                                )
+                            }
+                        } else {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            ) {
+                                BaselineAlignedRaTeX(
+                                    latex = formula,
+                                    displayMode = true,
+                                    fontSize = BLOCK_FONT_SIZE,
+                                    color = themeColor,
+                                    precomputedDisplayList = blockDl,
+                                )
+                            }
+                        }
                     }
                 } else {
                     textGroup.add(child)

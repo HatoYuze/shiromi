@@ -93,20 +93,33 @@ fun MessageBubble(
     editingMessageId: String? = null,
     onSendEdit: ((String, String) -> Unit)? = null,
     onCancelEdit: (() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val isEditing = editingMessageId == message.id && message.isUser
     val displayContent = message.content
     val colorScheme = MaterialTheme.colorScheme
     val typography = rememberMarkdownTypography(colorScheme = colorScheme)
-    val mdColors = com.mikepenz.markdown.m3.markdownColor(
-        text = colorScheme.onSurface,
-        codeText = colorScheme.primary,
-        codeBackground = colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        inlineCodeText = colorScheme.primary,
-        inlineCodeBackground = colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        linkText = colorScheme.primary,
-    )
-
+    // 移动端用户气泡为实心主色，正文/链接/代码一律用白色系保证对比度。
+    // 注：markdownColor 为 @Composable，无法放入 remember 缓存，构建开销可忽略。
+    val mdColors = if (compact && message.isUser) {
+        com.mikepenz.markdown.m3.markdownColor(
+            text = Color.White,
+            codeText = Color.White,
+            codeBackground = Color.White.copy(alpha = 0.18f),
+            inlineCodeText = Color.White,
+            inlineCodeBackground = Color.White.copy(alpha = 0.22f),
+            linkText = Color(0xFFDCE3FF),
+        )
+    } else {
+        com.mikepenz.markdown.m3.markdownColor(
+            text = colorScheme.onSurface,
+            codeText = colorScheme.primary,
+            codeBackground = colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            inlineCodeText = colorScheme.primary,
+            inlineCodeBackground = colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            linkText = colorScheme.primary,
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -114,17 +127,22 @@ fun MessageBubble(
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = if (message.isUser)
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            else
-                MaterialTheme.colorScheme.surfaceBright,
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (message.isUser)
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
-            ),
+            color = when {
+                message.isUser && compact -> MaterialTheme.colorScheme.primary
+                message.isUser -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                else -> MaterialTheme.colorScheme.surfaceBright
+            },
+            border = if (compact && message.isUser) {
+                null
+            } else {
+                BorderStroke(
+                    width = 1.dp,
+                    color = if (message.isUser)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+                )
+            },
             modifier = Modifier.align(if (message.isUser) Alignment.End else Alignment.Start)
                 .fillMaxWidth(if (message.isUser) 0.75f else 0.92f)
         ) {

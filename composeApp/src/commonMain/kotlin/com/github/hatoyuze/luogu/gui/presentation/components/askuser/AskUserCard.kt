@@ -2,10 +2,16 @@ package com.github.hatoyuze.luogu.gui.presentation.components.askuser
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -35,11 +42,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.platform.currentTimeMillis
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.Clock
 import compose.icons.feathericons.HelpCircle
 import kotlinx.coroutines.delay
@@ -62,6 +72,7 @@ fun AskUserCard(
     startedAtMs: Long,
     onAnswer: (selectedOptions: List<String>, customText: String) -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     var remainingMs by remember { mutableStateOf(timeoutMs - (currentTimeMillis() - startedAtMs)) }
@@ -95,6 +106,13 @@ fun AskUserCard(
     var customText by remember { mutableStateOf("") }
     val canSubmit = selectedOptions.isNotEmpty() || (allowCustom && customText.isNotBlank())
 
+    // ── 收回 / 展开（每条新提问默认展开）──
+    var expanded by remember(startedAtMs) { mutableStateOf(true) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "askUserChevron",
+    )
+
     AnimatedVisibility(
         visible = true,
         enter = fadeIn() + expandVertically(),
@@ -109,9 +127,11 @@ fun AskUserCard(
             Column(
                 modifier = Modifier.padding(16.dp),
             ) {
-                // ── Header: icon + question + timer ──
+                // ── Header: icon + question + timer + 收展箭头（可点击）──
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = !expanded },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -152,10 +172,24 @@ fun AskUserCard(
                             )
                         }
                     }
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        FeatherIcons.ChevronDown,
+                        contentDescription = if (expanded) "收回" else "展开",
+                        tint = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(16.dp).rotate(chevronRotation),
+                    )
                 }
 
-                if (options.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
+                // ── 可收回的选项区 / 自定义输入 / 提交 ──
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Column {
+                        if (options.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
 
                     // ── Options list (vertical, scrollable) ──
                     Column(
@@ -188,13 +222,46 @@ fun AskUserCard(
                                         }
                                     },
                             ) {
-                                Text(
-                                    text = option,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                                    color = if (isSelected) colorScheme.primary
-                                            else colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    if (compact) {
+                                        // 移动端：单选圆点 / 多选方框
+                                        val indicatorShape = if (isMulti) RoundedCornerShape(4.dp) else CircleShape
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(indicatorShape)
+                                                .background(
+                                                    if (isSelected) colorScheme.primary else Color.Transparent,
+                                                    indicatorShape,
+                                                )
+                                                .border(
+                                                    width = 1.5.dp,
+                                                    color = if (isSelected) colorScheme.primary
+                                                    else colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                    shape = indicatorShape,
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (isSelected) {
+                                                if (isMulti) {
+                                                    Text("✓", fontSize = 10.sp, color = colorScheme.onPrimary)
+                                                } else {
+                                                    Box(Modifier.size(5.dp).background(colorScheme.onPrimary, CircleShape))
+                                                }
+                                            }
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                    }
+                                    Text(
+                                        text = option,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                                        color = if (isSelected) colorScheme.primary
+                                                else colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
@@ -233,27 +300,43 @@ fun AskUserCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
                 ) {
-                    Surface(
-                        modifier = Modifier.clickable(enabled = canSubmit) {
-                            if (canSubmit) {
-                                onAnswer(selectedOptions.toList(), customText)
-                            }
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (canSubmit) colorScheme.primary.copy(alpha = 0.1f)
-                                else colorScheme.primary.copy(alpha = 0.03f),
-                        border = BorderStroke(1.dp,
-                            if (canSubmit) colorScheme.primary.copy(alpha = 0.2f)
-                            else colorScheme.primary.copy(alpha = 0.08f)),
-                    ) {
-                        Text(
-                            "提交",
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (canSubmit) colorScheme.primary
-                                    else colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        )
+                    if (compact) {
+                        Button(
+                            onClick = {
+                                if (canSubmit) {
+                                    onAnswer(selectedOptions.toList(), customText)
+                                }
+                            },
+                            enabled = canSubmit,
+                            shape = RoundedCornerShape(10.dp),
+                        ) {
+                            Text("提交")
+                        }
+                    } else {
+                        Surface(
+                            modifier = Modifier.clickable(enabled = canSubmit) {
+                                if (canSubmit) {
+                                    onAnswer(selectedOptions.toList(), customText)
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (canSubmit) colorScheme.primary.copy(alpha = 0.1f)
+                                    else colorScheme.primary.copy(alpha = 0.03f),
+                            border = BorderStroke(1.dp,
+                                if (canSubmit) colorScheme.primary.copy(alpha = 0.2f)
+                                else colorScheme.primary.copy(alpha = 0.08f)),
+                        ) {
+                            Text(
+                                "提交",
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (canSubmit) colorScheme.primary
+                                        else colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            )
+                        }
                     }
+                }
+                }
                 }
             }
         }
