@@ -22,10 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.github.hatoyuze.luogu.gui.platform.currentTimeMillis
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronLeft
 import compose.icons.feathericons.ChevronRight
+import kotlin.time.TimeSource
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
 
@@ -40,12 +40,22 @@ fun daysInMonth(year: Int, month: Int): Int = when (month) {
     else -> 30
 }
 
-fun firstDayOffset(year: Int, month: Int): Int {
+fun firstDayOffset(year: Int, month: Int, mondayFirst: Boolean = false): Int {
     val firstDay = LocalDate(year, month, 1)
-    return (firstDay.dayOfWeek.ordinal + 1) % 7
+    // kotlinx-datetime ordinal：MONDAY=0 … SUNDAY=6
+    return if (mondayFirst) {
+        // 周一优先：周一在第 0 列
+        firstDay.dayOfWeek.ordinal
+    } else {
+        // 周日优先：周日在第 0 列
+        (firstDay.dayOfWeek.ordinal + 1) % 7
+    }
 }
 
 private val WEEKDAY_HEADERS = listOf("日", "一", "二", "三", "四", "五", "六")
+
+/** 双击判定窗口：两次点击间隔小于该值视为双击（新建/编辑事件）。 */
+private const val DOUBLE_TAP_WINDOW_MS = 400L
 
 // ═══════════════════════════════════════════════════════════════
 // CalendarPanel
@@ -62,22 +72,27 @@ fun CalendarPanel(
     onNavigateMonth: (Int) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     onNavigateToToday: () -> Unit,
-    onAddEvent: (String, LocalDate, Int, Boolean) -> Unit,
+    onAddEvent: (String, LocalDate, Int, Boolean, Boolean, Int?) -> Unit,
     onDeleteEvent: (String) -> Unit,
     showOverlay: ((@Composable () -> Unit) -> Unit)? = null,
     hideOverlay: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val isCurrentMonth = displayedYear == today.year && displayedMonth == today.month.number
     val days = daysInMonth(displayedYear, displayedMonth)
-    val offset = firstDayOffset(displayedYear, displayedMonth)
+    val offset = firstDayOffset(displayedYear, displayedMonth, mondayFirst = compact)
     val focusRequester = remember { FocusRequester() }
+    // 移动端（compact）周一优先：一、二、三、四、五、六、日
+    val weekdayHeaders = if (compact) listOf("一", "二", "三", "四", "五", "六", "日") else WEEKDAY_HEADERS
 
     // ── Dialog state (owned by CalendarPanel, not HomeScreen) ──
     var eventDialogDate by remember { mutableStateOf<LocalDate?>(null) }
     var eventDialogName by remember { mutableStateOf("") }
     var eventDialogColor by remember { mutableStateOf(0) }
     var eventDialogPinned by remember { mutableStateOf(false) }
+    var eventDialogAllDay by remember { mutableStateOf(false) }
+    var eventDialogTimeMinutes by remember { mutableStateOf<Int?>(null) }
     var eventDialogExistingId by remember { mutableStateOf<String?>(null) }
 
     // Build lookup maps from events list
@@ -132,8 +147,26 @@ fun CalendarPanel(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!isCurrentMonth || selectedDate != null) {
-                        TextButton(onClick = onNavigateToToday) {
-                            Text("今天", fontSize = 13.sp)
+                        if (compact) {
+                            // 移动端「今天」胶囊
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                                modifier = Modifier.clickable { onNavigateToToday() },
+                            ) {
+                                Text(
+                                    "今天",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                )
+                            }
+                        } else {
+                            TextButton(onClick = onNavigateToToday) {
+                                Text("今天", fontSize = 13.sp)
+                            }
                         }
                     }
                     IconButton(onClick = { onNavigateMonth(1) }) {
@@ -146,7 +179,7 @@ fun CalendarPanel(
 
             // ── Weekday headers ──
             Row(modifier = Modifier.fillMaxWidth()) {
-                WEEKDAY_HEADERS.forEach { day ->
+                weekdayHeaders.forEach { day ->
                     Text(
                         text = day,
                         modifier = Modifier.weight(1f),
@@ -184,9 +217,12 @@ fun CalendarPanel(
                                     eventDialogName = existing?.name ?: ""
                                     eventDialogColor = existing?.color ?: 0
                                     eventDialogPinned = existing?.pinned ?: false
+                                    eventDialogAllDay = existing?.allDay ?: false
+                                    eventDialogTimeMinutes = existing?.timeMinutes
                                     eventDialogExistingId = existing?.id
                                 },
                                 modifier = Modifier.weight(1f),
+                                compact = compact,
                             )
                         } else {
                             Spacer(Modifier.weight(1f))
@@ -206,6 +242,8 @@ fun CalendarPanel(
             val name = eventDialogName
             val color = eventDialogColor
             val pinned = eventDialogPinned
+            val allDay = eventDialogAllDay
+            val timeMinutes = eventDialogTimeMinutes
             val existingId = eventDialogExistingId
 
             fun dismiss() {
@@ -213,6 +251,8 @@ fun CalendarPanel(
                 eventDialogName = ""
                 eventDialogColor = 0
                 eventDialogPinned = false
+                eventDialogAllDay = false
+                eventDialogTimeMinutes = null
                 eventDialogExistingId = null
             }
             showOverlay {
@@ -222,9 +262,9 @@ fun CalendarPanel(
                     initialColor = color,
                     initialPinned = pinned,
                     existingEventId = existingId,
-                    onSave = { n, c, p ->
+                    onSave = { n, c, p, a, t ->
                         existingId?.let { onDeleteEvent(it) }
-                        onAddEvent(n, date, c, p)
+                        onAddEvent(n, date, c, p, a, t)
                         dismiss()
                     },
                     onDelete = {
@@ -232,6 +272,9 @@ fun CalendarPanel(
                         dismiss()
                     },
                     onDismiss = { dismiss() },
+                    showTime = compact,
+                    initialAllDay = allDay,
+                    initialTimeMinutes = timeMinutes,
                 )
             }
         } else {
@@ -256,6 +299,7 @@ private fun CalendarDayCell(
     onClick: () -> Unit,
     onRightClick: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
@@ -263,18 +307,30 @@ private fun CalendarDayCell(
 
     val bgColor = when {
         hasEvent && eventColorInt != 0 -> eventColor.copy(alpha = 0.12f)
+        compact && isSelected -> primaryColor
         isToday -> primaryColor.copy(alpha = 0.12f)
         isSelected -> primaryColor.copy(alpha = 0.06f)
         else -> Color.Transparent
     }
 
-    val borderMod = if (isSelected) {
+    val borderMod = if (compact && isSelected) {
+        Modifier
+    } else if (isSelected) {
         Modifier.border(2.dp, primaryColor, CircleShape)
     } else {
         Modifier
     }
 
+    // 移动端选中日：实心主色圆 + 白字
+    val dayTextColor = when {
+        compact && isSelected -> Color.White
+        isToday -> primaryColor
+        else -> onSurfaceColor
+    }
+
     var lastTapMs by remember { mutableStateOf(0L) }
+    // 单调时钟基准：双击判定不受系统时间回拨（NTP/自动校时）影响
+    val monoBase = remember { TimeSource.Monotonic.markNow() }
 
     // The pointerInput coroutine below outlives recompositions; rememberUpdatedState
     // ensures it always calls the LATEST onRightClick (whose closure captures the
@@ -289,9 +345,9 @@ private fun CalendarDayCell(
             .background(bgColor)
             .then(borderMod)
             .clickable {
-                val now = currentTimeMillis()
-                if (hasEvent && now - lastTapMs < 400L) {
-                    onRightClick()  // double-tap → edit
+                val now = monoBase.elapsedNow().inWholeMilliseconds
+                if (now - lastTapMs < DOUBLE_TAP_WINDOW_MS) {
+                    onRightClick()  // double-tap → 新建（无事件）/编辑（有事件）
                 } else {
                     onClick()       // single tap → select
                 }
@@ -316,10 +372,7 @@ private fun CalendarDayCell(
                 text = dayNum.toString(),
                 fontSize = 13.sp,
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = when {
-                    isToday -> primaryColor
-                    else -> onSurfaceColor
-                },
+                color = dayTextColor,
                 textAlign = TextAlign.Center,
             )
             // Dots

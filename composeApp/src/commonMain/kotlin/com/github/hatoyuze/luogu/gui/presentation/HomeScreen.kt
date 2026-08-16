@@ -24,10 +24,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.hatoyuze.luogu.gui.config.AppConfigStore
+import com.github.hatoyuze.luogu.gui.config.ConfigService
 import com.github.hatoyuze.luogu.gui.domain.model.*
 import com.github.hatoyuze.luogu.gui.presentation.components.CalendarPanel
 import com.github.hatoyuze.luogu.gui.presentation.components.HomeDesignTokens
 import com.github.hatoyuze.luogu.gui.presentation.components.ExtensionSlot
+import com.github.hatoyuze.luogu.gui.presentation.login.LuoguLoginDialog
 import com.github.hatoyuze.luogu.gui.presentation.components.DailyProblemCard
 import com.github.hatoyuze.luogu.gui.presentation.components.DateDisplayBlock
 import com.github.hatoyuze.luogu.gui.presentation.components.ProblemDetailPage
@@ -59,6 +62,10 @@ fun HomeScreen(
     var dialogContent by remember { mutableStateOf<(@Composable () -> Unit)?>(null) }
     var isDialogVisible by remember { mutableStateOf(false) }
 
+    // ── 洛谷登录引导（首次运行 cookie 为空时）──
+    var showLoginBanner by remember { mutableStateOf(ConfigService.luoguCookie.isBlank()) }
+    var showLoginDialog by remember { mutableStateOf(false) }
+
     Box(modifier = modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxSize()) {
             HomeSidebar(
@@ -86,7 +93,9 @@ fun HomeScreen(
                 onAddTodo = { homeViewModel.addTodo(it) },
                 onToggleTodo = { id, completed -> homeViewModel.toggleTodo(id, completed) },
                 onDeleteTodo = { homeViewModel.deleteTodo(it) },
-                onAddEvent = { name, date, color, pinned -> homeViewModel.addCalendarEvent(name, date, color, pinned) },
+                onAddEvent = { name, date, color, pinned, allDay, timeMinutes ->
+                    homeViewModel.addCalendarEvent(name, date, color, pinned, allDay, timeMinutes)
+                },
                 onDeleteEvent = { homeViewModel.deleteCalendarEvent(it) },
                 onUpdateTopic = { name, goal -> homeViewModel.updateStudyTopic(name, goal) },
                 onRefreshDailyProblem = { homeViewModel.refreshDailyProblem() },
@@ -134,6 +143,50 @@ fun HomeScreen(
                 }
             }
         }
+
+        // ── 首次运行：未登录洛谷提示条 ──
+        if (showLoginBanner) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 2.dp,
+            ) {
+                Row(
+                    Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "尚未登录洛谷，推荐先登录以使用完整功能",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { showLoginDialog = true }) { Text("浏览器登录") }
+                    TextButton(onClick = { showLoginBanner = false }) { Text("稍后") }
+                }
+            }
+        }
+    }
+
+    val appConfigStore = org.koin.compose.koinInject<AppConfigStore>()
+    if (showLoginDialog) {
+        LuoguLoginDialog(
+            onDismiss = { showLoginDialog = false },
+            onSuccess = { session ->
+                showLoginDialog = false
+                showLoginBanner = false
+                ConfigService.luoguCookie = session.cookieString
+                session.uid?.takeIf { it > 0 }?.toString()?.let { ConfigService.luoguUid = it }
+                try {
+                    appConfigStore.save(ConfigService.toGuiConfig())
+                } catch (_: Exception) {
+                    // 持久化失败不阻塞登录成功反馈
+                }
+            },
+        )
     }
 }
 
@@ -410,7 +463,7 @@ private fun HomeMainContent(
     onAddTodo: (String) -> Unit,
     onToggleTodo: (String, Boolean) -> Unit,
     onDeleteTodo: (String) -> Unit,
-    onAddEvent: (String, LocalDate, Int, Boolean) -> Unit,
+    onAddEvent: (String, LocalDate, Int, Boolean, Boolean, Int?) -> Unit,
     onDeleteEvent: (String) -> Unit,
     onUpdateTopic: (String, Int) -> Unit,
     onRefreshDailyProblem: () -> Unit,

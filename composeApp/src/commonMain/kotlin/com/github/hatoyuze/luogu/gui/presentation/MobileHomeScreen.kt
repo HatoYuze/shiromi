@@ -1,6 +1,9 @@
 package com.github.hatoyuze.luogu.gui.presentation
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -14,26 +17,44 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.domain.model.SessionType
+import com.github.hatoyuze.luogu.gui.domain.model.TodoItemDomainModel
 import com.github.hatoyuze.luogu.gui.presentation.components.CalendarPanel
 import com.github.hatoyuze.luogu.gui.presentation.components.DailyProblemCard
 import com.github.hatoyuze.luogu.gui.presentation.components.ProblemDetailPage
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatEvent
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatViewModel
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel
+import com.github.hatoyuze.luogu.gui.presentation.utils.formatDue
+import com.github.hatoyuze.luogu.gui.presentation.utils.formatEventTime
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.BookOpen
+import compose.icons.feathericons.Check
+import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Send
 import compose.icons.feathericons.Trash2
 import compose.icons.feathericons.Search
 import compose.icons.feathericons.Settings
+import compose.icons.feathericons.X
+import kotlin.time.Clock
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * 手机端（Compact）首页：顶部品牌栏 + 日历/今日/待办 三 Tab 分页（可横滑）。
@@ -66,19 +87,13 @@ fun MobileHomeScreen(
             // ── 顶栏：品牌 + 设置 ──
             MobileHomeTopBar(onSettings = onSettings)
 
-            // ── TabRow + Pager ──
-            TabRow(
-                selectedTabIndex = pagerState.currentPage,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                tabTitles.forEachIndexed { index, title ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                        text = { Text(title, fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal) },
-                    )
-                }
-            }
+            // ── 分段胶囊 Tab + Pager ──
+            MobileSegmentedTabs(
+                titles = tabTitles,
+                selectedIndex = pagerState.currentPage,
+                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            )
 
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
                 when (page) {
@@ -96,7 +111,7 @@ fun MobileHomeScreen(
                     )
                     else -> TodoPage(
                         state = state,
-                        onAddTodo = { homeViewModel.addTodo(it) },
+                        onAddTodo = { title, dueAt -> homeViewModel.addTodo(title, dueAt) },
                         onToggleTodo = { id, completed -> homeViewModel.toggleTodo(id, completed) },
                         onDeleteTodo = { homeViewModel.deleteTodo(it) },
                     )
@@ -149,8 +164,71 @@ fun MobileHomeScreen(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// 分段胶囊 Tab（替代 Material TabRow）
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun MobileSegmentedTabs(
+    titles: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        modifier = modifier,
+    ) {
+        Row(Modifier.fillMaxWidth().padding(4.dp)) {
+            titles.forEachIndexed { index, title ->
+                val selected = index == selectedIndex
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    else Color.Transparent,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
+                        ) { onSelect(index) },
+                ) {
+                    Text(
+                        title,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(vertical = 10.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 顶栏
 // ═══════════════════════════════════════════════════════════════
+
+/** 信息胶囊（今日页）：warm 用暖金（secondary），否则主色浅底。 */
+@Composable
+private fun InfoPill(text: String, warm: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val bg = if (warm) scheme.secondary.copy(alpha = 0.12f) else scheme.primary.copy(alpha = 0.1f)
+    val fg = if (warm) scheme.secondary else scheme.primary
+    Surface(shape = RoundedCornerShape(12.dp), color = bg) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            color = fg,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+        )
+    }
+}
 
 @Composable
 private fun MobileHomeTopBar(onSettings: () -> Unit) {
@@ -211,11 +289,14 @@ private fun CalendarPage(
             onNavigateMonth = { homeViewModel.navigateMonth(it) },
             onSelectDate = { homeViewModel.selectDate(it) },
             onNavigateToToday = { homeViewModel.navigateToToday() },
-            onAddEvent = { name, date, color, pinned -> homeViewModel.addCalendarEvent(name, date, color, pinned) },
+            onAddEvent = { name, date, color, pinned, allDay, timeMinutes ->
+                homeViewModel.addCalendarEvent(name, date, color, pinned, allDay, timeMinutes)
+            },
             onDeleteEvent = { homeViewModel.deleteCalendarEvent(it) },
             showOverlay = showOverlay,
             hideOverlay = hideOverlay,
             modifier = Modifier.fillMaxWidth(),
+            compact = true,
         )
 
         // ── 当日事件 ──
@@ -240,7 +321,7 @@ private fun CalendarPage(
                 }
                 if (dayEvents.isEmpty()) {
                     Text(
-                        "双击日期可新建事件",
+                        "暂无事件",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                         modifier = Modifier.padding(vertical = 10.dp),
@@ -265,6 +346,16 @@ private fun CalendarPage(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f),
                             )
+                            // 时间列（全天 / HH:mm / 未指定为空）
+                            val eventTimeText = formatEventTime(event.allDay, event.timeMinutes)
+                            if (eventTimeText.isNotEmpty()) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    eventTimeText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            }
                             if (event.pinned) {
                                 Text("置顶", style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
@@ -284,6 +375,12 @@ private fun CalendarPage(
                         }
                     }
                 }
+                Text(
+                    "双击日期新建事件 · 点按选择",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
         }
     }
@@ -295,6 +392,11 @@ private fun weekdayName(date: LocalDate): String {
     val mondayBasedIndex = ((date.toEpochDays() + 3) % 7).toInt()
     return names[mondayBasedIndex]
 }
+
+private fun monthNameCn(month: Int): String = listOf(
+    "一月", "二月", "三月", "四月", "五月", "六月",
+    "七月", "八月", "九月", "十月", "十一月", "十二月",
+)[month - 1]
 
 // ═══════════════════════════════════════════════════════════════
 // 今日页
@@ -331,7 +433,7 @@ private fun TodayPage(
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.padding(bottom = 5.dp)) {
                         Text(
-                            "${today.monthNumber}月 · ${weekdayName(today)}",
+                            "${monthNameCn(today.monthNumber)} · ${weekdayName(today)}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -350,9 +452,9 @@ private fun TodayPage(
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = {}, label = { Text("🔥 连续 ${state.streakDays} 天") })
+                    InfoPill("🔥 连续 ${state.streakDays} 天", warm = true)
                     if (todayEventCount > 0) {
-                        AssistChip(onClick = {}, label = { Text("$todayEventCount 个事件") })
+                        InfoPill("$todayEventCount 个事件", warm = false)
                     }
                 }
             }
@@ -364,6 +466,7 @@ private fun TodayPage(
             onRefresh = onRefreshDailyProblem,
             onViewDetail = onViewProblemDetail,
             modifier = Modifier.fillMaxWidth(),
+            compact = true,
         )
 
         // ── 搜索（尾部按钮提交，不依赖 Enter 键）──
@@ -377,23 +480,37 @@ private fun TodayPage(
                 Icon(FeatherIcons.Search, contentDescription = null, modifier = Modifier.size(18.dp))
             },
             trailingIcon = {
-                IconButton(
-                    onClick = {
-                        val pid = searchQuery.trim()
-                        val valid = pid.startsWith("P", ignoreCase = true) || pid.all { it.isDigit() }
-                        if (pid.isBlank() || !valid) {
-                            searchError = true
-                        } else {
-                            searchError = false
-                            onViewProblemDetail(pid)
-                        }
-                    },
-                    enabled = searchQuery.isNotBlank(),
+                val canSearch = searchQuery.isNotBlank()
+                Surface(
+                    shape = CircleShape,
+                    color = if (canSearch) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                    modifier = Modifier.padding(end = 6.dp).size(30.dp),
                 ) {
-                    Icon(
-                        FeatherIcons.Send, contentDescription = "搜索",
-                        modifier = Modifier.size(18.dp),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clickable(
+                                enabled = canSearch,
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() },
+                            ) {
+                                val pid = searchQuery.trim()
+                                val valid = pid.startsWith("P", ignoreCase = true) || pid.all { it.isDigit() }
+                                if (pid.isBlank() || !valid) {
+                                    searchError = true
+                                } else {
+                                    searchError = false
+                                    onViewProblemDetail(pid)
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            FeatherIcons.Send, contentDescription = "搜索",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             },
             singleLine = true,
@@ -407,6 +524,22 @@ private fun TodayPage(
 
         // ── 学习进度 ──
         ContentCard(title = "📊 学习进度", modifier = Modifier.fillMaxWidth()) {
+            // 解题统计暂无写入链路时（solvedTotal=0）隐藏，避免误导
+            if (state.solvedTotal > 0) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        "已刷题 ${state.solvedTotal} · 本周 +${state.solvedThisWeek}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "目标 ${state.studyTopic.goalCount}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+            }
             StreakRow(streakDays = state.streakDays)
             Spacer(Modifier.height(10.dp))
             TopicProgressBar(topic = state.studyTopic, onUpdateTopic = onUpdateTopic)
@@ -425,13 +558,13 @@ private fun TodayPage(
 
 
 // ═══════════════════════════════════════════════════════════════
-// 待办页
+// 待办页（移动端私有实现：输入行 + 到期胶囊 + 圆形复选 + 虚线分隔）
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
 private fun TodoPage(
     state: HomeViewModel.HomeUiState,
-    onAddTodo: (String) -> Unit,
+    onAddTodo: (String, Long?) -> Unit,
     onToggleTodo: (String, Boolean) -> Unit,
     onDeleteTodo: (String) -> Unit,
 ) {
@@ -439,25 +572,22 @@ private fun TodoPage(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ContentCard(title = "📋 待办", modifier = Modifier.fillMaxWidth()) {
-            TodoInput(onAdd = onAddTodo)
-            Spacer(Modifier.height(8.dp))
-            if (state.todos.isEmpty()) {
-                Text(
-                    "暂无待办事项",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.padding(vertical = 12.dp),
-                )
-            } else {
-                state.todos.forEach { todo ->
-                    TodoRow(
-                        todo = todo,
-                        onToggle = { onToggleTodo(todo.id, todo.completed) },
-                        onDelete = { onDeleteTodo(todo.id) },
-                    )
-                }
-            }
+        MobileTodoCard(
+            todos = state.todos,
+            onAddTodo = onAddTodo,
+            onToggleTodo = onToggleTodo,
+            onDeleteTodo = onDeleteTodo,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        // ── 本周概览（完成率）──
+        if (state.todos.isNotEmpty()) {
+            val completed = state.todos.count { it.completed }
+            MobileOverviewCard(
+                completed = completed,
+                total = state.todos.size,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
 
         Text(
@@ -466,6 +596,271 @@ private fun TodoPage(
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
             modifier = Modifier.fillMaxWidth(),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun MobileTodoCard(
+    todos: List<TodoItemDomainModel>,
+    onAddTodo: (String, Long?) -> Unit,
+    onToggleTodo: (String, Boolean) -> Unit,
+    onDeleteTodo: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            MobileTodoInput(onAdd = onAddTodo)
+            Spacer(Modifier.height(12.dp))
+            if (todos.isEmpty()) {
+                Text(
+                    "暂无待办事项",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            } else {
+                todos.forEachIndexed { index, todo ->
+                    if (index > 0) DashedDivider()
+                    MobileTodoRow(
+                        todo = todo,
+                        onToggle = { onToggleTodo(todo.id, todo.completed) },
+                        onDelete = { onDeleteTodo(todo.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 到期日快捷计算（本地时区当天 23:59）。 */
+private fun endOfDayDue(date: LocalDate): Long =
+    date.atTime(23, 59).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
+
+private fun todayDate(): LocalDate =
+    Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+
+private fun dueFriday(): Long {
+    var d = todayDate()
+    while (d.dayOfWeek != DayOfWeek.FRIDAY) d = LocalDate.fromEpochDays(d.toEpochDays() + 1L)
+    return endOfDayDue(d)
+}
+
+/** 到期快捷选项（key 固定；epoch 在添加时按当天解析，避免跨零点后过期）。 */
+private val DUE_OPTIONS = listOf(
+    "无期限" to "none",
+    "今天" to "today",
+    "明天" to "tomorrow",
+    "本周五" to "friday",
+)
+
+private fun resolveDueKey(key: String): Long? = when (key) {
+    "today" -> endOfDayDue(todayDate())
+    "tomorrow" -> endOfDayDue(LocalDate.fromEpochDays(todayDate().toEpochDays() + 1L))
+    "friday" -> dueFriday()
+    else -> null
+}
+
+@Composable
+private fun MobileTodoInput(onAdd: (String, Long?) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    var dueKey by remember { mutableStateOf("none") }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            placeholder = { Text("添加新待办…", fontSize = 13.sp) },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .weight(1f)
+                .onKeyEvent { event ->
+                    if (event.key == Key.Enter && event.type == KeyEventType.KeyUp && text.isNotBlank()) {
+                        onAdd(text.trim(), resolveDueKey(dueKey))
+                        text = ""; dueKey = "none"
+                        true
+                    } else false
+                },
+            textStyle = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.width(8.dp))
+        val hasText = text.isNotBlank()
+        Surface(
+            shape = CircleShape,
+            color = if (hasText) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+            modifier = Modifier.size(40.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .clickable(
+                        enabled = hasText,
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) {
+                        onAdd(text.trim(), resolveDueKey(dueKey))
+                        text = ""; dueKey = "none"
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    FeatherIcons.Plus,
+                    contentDescription = "添加",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        DUE_OPTIONS.forEach { (label, key) ->
+            val selected = dueKey == key
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) { dueKey = key },
+            ) {
+                Text(
+                    label,
+                    fontSize = 10.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MobileTodoRow(
+    todo: TodoItemDomainModel,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val done = todo.completed
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // 圆形复选框（完成 = 实心主色 + 白勾）
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(if (done) scheme.primary else Color.Transparent)
+                .border(1.5.dp, if (done) scheme.primary else scheme.outline.copy(alpha = 0.4f), CircleShape)
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) { onToggle() },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (done) {
+                Icon(
+                    FeatherIcons.Check,
+                    contentDescription = "已完成",
+                    tint = scheme.onPrimary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            todo.title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+            color = if (done) scheme.onSurfaceVariant.copy(alpha = 0.5f) else scheme.onSurface,
+        )
+        Spacer(Modifier.width(8.dp))
+        val dueText = formatDue(todo.dueAt, todo.completed)
+        if (dueText.isNotEmpty()) {
+            Text(
+                dueText,
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant.copy(alpha = 0.55f),
+            )
+            Spacer(Modifier.width(6.dp))
+        }
+        // 删除 ✕
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) { onDelete() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                FeatherIcons.X,
+                contentDescription = "删除",
+                tint = scheme.onSurfaceVariant.copy(alpha = 0.35f),
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MobileOverviewCard(
+    completed: Int,
+    total: Int,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("本周概览", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "待办完成率 $completed / $total",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { completed.toFloat() / total },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+        }
+    }
+}
+
+/** 虚线分隔线（待办行间）。 */
+@Composable
+private fun DashedDivider(color: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)) {
+    Canvas(Modifier.fillMaxWidth().height(1.dp)) {
+        drawLine(
+            color = color,
+            start = Offset(0f, 0f),
+            end = Offset(size.width, 0f),
+            strokeWidth = 1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
         )
     }
 }

@@ -45,6 +45,7 @@ fun DailyProblemCard(
     onRefresh: () -> Unit,
     onViewDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     Surface(
         modifier = modifier,
@@ -64,6 +65,7 @@ fun DailyProblemCard(
                 isLoading = state.isLoading,
                 onRefresh = onRefresh,
                 onViewDetail = onViewDetail,
+                compact = compact,
             )
             state.isLoading -> LoadingState()
             else -> EmptyState()
@@ -148,6 +150,7 @@ private fun ContentState(
     isLoading: Boolean,
     onRefresh: () -> Unit,
     onViewDetail: (String) -> Unit,
+    compact: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val detail = problemDetail?.problem
@@ -158,19 +161,41 @@ private fun ContentState(
     ) {
         // ── Header ──
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                FeatherIcons.BookOpen,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "每日一题",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            if (compact) {
+                // 移动端：方块主色浅底标 + 「每日推荐」
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                ) {
+                    Icon(
+                        FeatherIcons.BookOpen,
+                        contentDescription = null,
+                        modifier = Modifier.padding(4.dp).size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "每日推荐",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            } else {
+                Icon(
+                    FeatherIcons.BookOpen,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "每日一题",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             Spacer(Modifier.weight(1f))
             // Manual refresh button
             IconButton(
@@ -247,25 +272,27 @@ private fun ContentState(
 
         Spacer(Modifier.height(8.dp))
 
-        // ── Tips ──
-        result.tips.take(2).forEach { tip ->
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(
-                    FeatherIcons.AlertTriangle,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp).padding(top = 2.dp),
-                    tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = tip,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        // ── Tips（移动端 compact 隐藏，保持卡片紧凑）──
+        if (!compact) {
+            result.tips.take(2).forEach { tip ->
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        FeatherIcons.AlertTriangle,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp).padding(top = 2.dp),
+                        tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = tip,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
             }
-            Spacer(Modifier.height(2.dp))
         }
 
         Spacer(Modifier.height(8.dp))
@@ -276,17 +303,31 @@ private fun ContentState(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // View detail button
-            TextButton(
-                onClick = { onViewDetail(result.pid) },
-            ) {
-                Icon(
-                    FeatherIcons.Link,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
+            if (compact) {
+                // 移动端：右侧「查看详情 ›」
+                Text(
+                    "查看详情 ›",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { onViewDetail(result.pid) },
                 )
-                Spacer(Modifier.width(4.dp))
-                Text("查看详情", fontSize = 12.sp)
+            } else {
+                // View detail button
+                TextButton(
+                    onClick = { onViewDetail(result.pid) },
+                ) {
+                    Icon(
+                        FeatherIcons.Link,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("查看详情", fontSize = 12.sp)
+                }
             }
         }
     }

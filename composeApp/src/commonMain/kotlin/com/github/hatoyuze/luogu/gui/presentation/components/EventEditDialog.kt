@@ -34,12 +34,23 @@ import dev.zt64.compose.pipette.HsvColor
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
 import com.github.hatoyuze.luogu.gui.presentation.utils.toHex2
+import com.github.hatoyuze.luogu.gui.presentation.utils.toPad2
 
 // ═══════════════════════════════════════════════════════════════
 // EventEditDialog — self-contained event editing dialog
 // ═══════════════════════════════════════════════════════════════
 
 private const val MAX_NAME_LENGTH = 64
+
+/** 解析 "HH:mm" 文本 → 分钟数（0..1439）；非法返回 null。 */
+internal fun parseTimeMinutes(text: String): Int? {
+    val parts = text.split(":").map { it.trim() }
+    if (parts.size != 2) return null
+    val h = parts[0].toIntOrNull() ?: return null
+    val m = parts[1].toIntOrNull() ?: return null
+    if (h !in 0..23 || m !in 0..59) return null
+    return h * 60 + m
+}
 
 @Composable
 fun EventEditDialog(
@@ -48,13 +59,22 @@ fun EventEditDialog(
     initialColor: Int,        // ARGB int; 0 = use default
     initialPinned: Boolean = false,
     existingEventId: String?,
-    onSave: (name: String, color: Int, pinned: Boolean) -> Unit,
+    onSave: (name: String, color: Int, pinned: Boolean, allDay: Boolean, timeMinutes: Int?) -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
+    showTime: Boolean = false,
+    initialAllDay: Boolean = false,
+    initialTimeMinutes: Int? = null,
 ) {
     // ── State ──
     var name by remember { mutableStateOf(initialName) }
     var pinned by remember { mutableStateOf(initialPinned) }
+    var allDay by remember { mutableStateOf(initialAllDay) }
+    var timeText by remember(initialTimeMinutes) {
+        mutableStateOf(
+            initialTimeMinutes?.let { "${(it / 60).toPad2()}:${(it % 60).toPad2()}" } ?: ""
+        )
+    }
 
     val initialHsv = remember(initialColor) {
         if (initialColor != 0) HsvColor(Color(initialColor))
@@ -108,6 +128,35 @@ fun EventEditDialog(
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // ── Time controls（移动端 showTime=true 时显示）──
+            if (showTime) {
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("全天", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = allDay, onCheckedChange = { allDay = it })
+                }
+                if (!allDay) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = timeText,
+                        onValueChange = { input ->
+                            timeText = input.filter { it.isDigit() || it == ':' }.take(5)
+                        },
+                        placeholder = { Text("HH:mm", fontSize = 13.sp) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        // 非空但格式非法时红色提示，避免静默丢弃
+                        isError = timeText.isNotBlank() && parseTimeMinutes(timeText) == null,
+                    )
+                }
+            }
 
             Spacer(Modifier.height(16.dp))
 
@@ -219,7 +268,8 @@ fun EventEditDialog(
                     IconButton(
                         onClick = {
                             if (name.isNotBlank()) {
-                                onSave(name.trim(), hsvToArgb(hsvColor), pinned)
+                                val timeMinutes = if (allDay) null else parseTimeMinutes(timeText)
+                                onSave(name.trim(), hsvToArgb(hsvColor), pinned, allDay, timeMinutes)
                             }
                         },
                         enabled = name.isNotBlank(),
