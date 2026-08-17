@@ -22,22 +22,24 @@ import com.github.hatoyuze.luogu.skill.api.LuoguTags
 import com.github.hatoyuze.luogu.skill.api.ProblemDetailData
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.BookOpen
-import compose.icons.feathericons.ChevronRight
-import compose.icons.feathericons.RefreshCw
-import compose.icons.feathericons.Link
 import compose.icons.feathericons.AlertTriangle
+import compose.icons.feathericons.RefreshCw
 
 // ═══════════════════════════════════════════════════════════
-// DailyProblemCard — Flat-design daily problem card
+// DailyProblemCard — 每日推荐（桌面与移动端统一卡片）
+//
+// 对齐 mobile-ui-preview.html 与 desktop-home-design.html 的「每日推荐」卡：
+// 方块主色徽标 + 标题 + 刷新，题目 / 难度 / 标签 / 推荐理由，
+// 右下「查看详情 ›」。tips 默认隐藏（设计稿不展示），可用 showTips 恢复。
 // ═══════════════════════════════════════════════════════════
 
 /**
- * Displays the AI-recommended daily problem in a flat-design card
- * matching the [DateDisplayBlock] style.
+ * 每日推荐卡片（AI 推荐题目）。
  *
- * @param state Current state from [DailyProblemAgent]
- * @param onRefresh Trigger a manual refresh
- * @param onViewDetail Open the problem detail page for [pid]
+ * @param state 来自 [DailyProblemAgent] 的当前状态
+ * @param onRefresh 手动刷新
+ * @param onViewDetail 打开题目详情
+ * @param showTips 是否展示 LLM 附带的小贴士（默认隐藏，对齐设计稿）
  */
 @Composable
 fun DailyProblemCard(
@@ -45,15 +47,13 @@ fun DailyProblemCard(
     onRefresh: () -> Unit,
     onViewDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
+    showTips: Boolean = false,
 ) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
-        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
         shadowElevation = 0.dp,
     ) {
         when {
@@ -65,7 +65,7 @@ fun DailyProblemCard(
                 isLoading = state.isLoading,
                 onRefresh = onRefresh,
                 onViewDetail = onViewDetail,
-                compact = compact,
+                showTips = showTips,
             )
             state.isLoading -> LoadingState()
             else -> EmptyState()
@@ -150,19 +150,17 @@ private fun ContentState(
     isLoading: Boolean,
     onRefresh: () -> Unit,
     onViewDetail: (String) -> Unit,
-    compact: Boolean = false,
+    showTips: Boolean,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val detail = problemDetail?.problem
 
     Box(Modifier.fillMaxSize()) {
-    Column(
-        Modifier.fillMaxSize().padding(20.dp),
-    ) {
-        // ── Header ──
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (compact) {
-                // 移动端：方块主色浅底标 + 「每日推荐」
+        Column(
+            Modifier.fillMaxSize().padding(18.dp),
+        ) {
+            // ── Header：方块主色徽标 + 每日推荐 + 刷新 ──
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
@@ -181,130 +179,112 @@ private fun ContentState(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-            } else {
-                Icon(
-                    FeatherIcons.BookOpen,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "每日一题",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                Spacer(Modifier.weight(1f))
+                // Manual refresh button
+                IconButton(
+                    onClick = onRefresh,
+                    enabled = !isLoading,
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Icon(
+                        FeatherIcons.RefreshCw,
+                        contentDescription = "刷新",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    )
+                }
             }
-            Spacer(Modifier.weight(1f))
-            // Manual refresh button
-            IconButton(
-                onClick = onRefresh,
-                enabled = !isLoading,
-                modifier = Modifier.size(24.dp),
-            ) {
-                Icon(
-                    FeatherIcons.RefreshCw,
-                    contentDescription = "刷新",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                )
-            }
-        }
 
-        Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-        // ── Title + Difficulty ──
-        Text(
-            text = "${result.pid} ${detail?.name ?: ""}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+            // ── Title + Difficulty ──
+            Text(
+                text = "${result.pid} ${detail?.name ?: ""}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
 
-        Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-        // ── Tags / Difficulty ──
-        if (detail != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                DifficultyChip(detail.difficulty)
-                val tags = remember(detail.tags) { LuoguTags.resolveTags(detail.tags).take(3) }
-                tags.forEach { tag ->
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                    ) {
-                        Text(
-                            text = tag.name,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
+            // ── Tags / Difficulty ──
+            if (detail != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DifficultyChip(detail.difficulty)
+                    val tags = remember(detail.tags) { LuoguTags.resolveTags(detail.tags).take(3) }
+                    tags.forEach { tag ->
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        ) {
+                            Text(
+                                text = tag.name,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
 
-        // ── Reason (intro) ──
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Icon(
-                FeatherIcons.ChevronRight,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = result.reason,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                maxLines = 5,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // ── Tips（移动端 compact 隐藏，保持卡片紧凑）──
-        if (!compact) {
-            result.tips.take(2).forEach { tip ->
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(
-                        FeatherIcons.AlertTriangle,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp).padding(top = 2.dp),
-                        tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = tip,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(Modifier.height(2.dp))
+            // ── Reason (intro) ──
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Icon(
+                    FeatherIcons.BookOpen,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp).padding(top = 1.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = result.reason,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-        }
 
-        Spacer(Modifier.height(8.dp))
+            // ── Tips（默认隐藏；showTips 恢复）──
+            if (showTips) {
+                Spacer(Modifier.height(6.dp))
+                result.tips.take(2).forEach { tip ->
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(
+                            FeatherIcons.AlertTriangle,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp).padding(top = 2.dp),
+                            tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = tip,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                }
+            }
 
-        // ── Bottom action row ──
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (compact) {
-                // 移动端：右侧「查看详情 ›」
+            Spacer(Modifier.height(8.dp))
+
+            // ── Bottom action：查看详情 › ──
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     "查看详情 ›",
                     fontSize = 12.sp,
@@ -312,39 +292,26 @@ private fun ContentState(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable(
                         indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                     ) { onViewDetail(result.pid) },
                 )
-            } else {
-                // View detail button
-                TextButton(
-                    onClick = { onViewDetail(result.pid) },
-                ) {
-                    Icon(
-                        FeatherIcons.Link,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text("查看详情", fontSize = 12.sp)
-                }
+            }
+        }
+
+        // ── Loading overlay during refresh ──
+        if (isLoading) {
+            Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                )
             }
         }
     }
-    // ── Loading overlay during refresh ──
-    if (isLoading) {
-        Box(
-            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-            )
-        }
-    }
-    } // end Box
 }
 
 @Composable

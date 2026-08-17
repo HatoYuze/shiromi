@@ -3,54 +3,46 @@ package com.github.hatoyuze.luogu.gui.presentation.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Shared design tokens for Home page card components.
+ * Shared design tokens for Home page components.
  *
- * All cards use the same shape, border, and spacing to maintain
- * visual consistency across CalendarPanel, DateDisplayBlock,
- * DailyProblemCard, and ExtensionSlot.
+ * 桌面与移动端首页共用同一套形状 / 描边 / 间距 / 尺寸，保证双端视觉一致
+ * （对齐 mobile-ui-preview.html 与 desktop-home-design.html 的「暖米纸色 +
+ * 白卡圆角 + 藏蓝主色 + 暖金胶囊」语言）。
  */
 object HomeDesignTokens {
-    /** Standard card corner radius — matches DateDisplayBlock */
+    /** 标准卡片圆角（白卡）。 */
     val CardShape = RoundedCornerShape(16.dp)
 
-    /** Flat border — no shadows, subtle outline separation */
+    /** 标准卡片描边 —— 无阴影，浅色细描边做分隔。 */
     val CardBorder
         @androidx.compose.runtime.Composable
         get() = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
 
-    /** Inner padding for card content */
-    val CardContentPadding = 20.dp
-
-    /** Horizontal gap between cards in a row */
+    /** 卡片水平/垂直间距（首页网格）。 */
     val RowSpacing = 16.dp
 
-    /** Vertical gap between major sections */
-    val SectionSpacing = 20.dp
+    /** 卡片内边距（对齐设计稿 padding:16px）。 */
+    val CardPadding: Dp = 16.dp
 
-    /** Maximum content width for the main scrollable area */
-    val ContentMaxWidth = 800.dp
+    /** 信息胶囊圆角。 */
+    val PillShape = RoundedCornerShape(12.dp)
 
-    /** Calendar panel max width — 7 columns × ~54dp each */
-    val CalendarMaxWidth = 380.dp
+    /** 小号胶囊/标签圆角。 */
+    val SmallPillShape = RoundedCornerShape(8.dp)
 
-    /** Date display max width — 96sp number + padding */
-    val DateDisplayMaxWidth = 280.dp
+    /** 输入条圆角。 */
+    val InputShape = RoundedCornerShape(12.dp)
 
-    /** Search bar max width — slightly narrower than calendar row total */
-    val SearchBarMaxWidth = 500.dp
+    /** 桌面侧栏宽度。 */
+    val SidebarWidth = 264.dp
 
-    /** Daily problem card max width */
-    val DailyProblemMaxWidth = 350.dp
+    /** 桌面信息轨宽度。 */
+    val RailWidth = 300.dp
 
-    /** Extension slot max width — symmetric with DailyProblemCard */
-    val ExtensionMaxWidth = 350.dp
-
-    /** Bottom bar horizontal padding */
-    val BottomBarHPadding = 48.dp
-
-    /** Bottom bar vertical padding */
-    val BottomBarVPadding = 16.dp
+    /** 信息轨与主列并排所需的最小内容区宽度（dp）。 */
+    val RailBreakpoint = 820.dp
 }

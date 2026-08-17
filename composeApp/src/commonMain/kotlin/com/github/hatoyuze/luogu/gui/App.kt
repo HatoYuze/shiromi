@@ -17,11 +17,11 @@ import com.github.hatoyuze.luogu.gui.data.local.DatabaseWrapper
 import com.github.hatoyuze.luogu.gui.di.commonModule
 import com.github.hatoyuze.luogu.gui.di.platformModule
 import com.github.hatoyuze.luogu.gui.presentation.ChatScreen
-import com.github.hatoyuze.luogu.gui.presentation.HomeScreen
 import com.github.hatoyuze.luogu.gui.presentation.MobileHomeScreen
 import com.github.hatoyuze.luogu.gui.presentation.SettingsScreen
 import com.github.hatoyuze.luogu.gui.presentation.adaptive.PlatformSizeClass
 import com.github.hatoyuze.luogu.gui.presentation.adaptive.calculatePlatformSizeClass
+import com.github.hatoyuze.luogu.gui.presentation.home.HomeScreen
 import com.github.hatoyuze.luogu.gui.presentation.onboarding.OnboardingScreen
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatViewModel
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel

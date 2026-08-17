@@ -5,11 +5,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
-import androidx.compose.ui.input.pointer.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,10 +31,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.hatoyuze.luogu.gui.domain.model.CalendarEvent
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronLeft
 import compose.icons.feathericons.ChevronRight
@@ -29,9 +46,9 @@ import kotlin.time.TimeSource
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // Calendar helpers
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 
 fun daysInMonth(year: Int, month: Int): Int = when (month) {
     1, 3, 5, 7, 8, 10, 12 -> 31
@@ -52,15 +69,105 @@ fun firstDayOffset(year: Int, month: Int, mondayFirst: Boolean = false): Int {
     }
 }
 
-private val WEEKDAY_HEADERS = listOf("日", "一", "二", "三", "四", "五", "六")
+private val WEEKDAY_HEADERS_SUNDAY_FIRST = listOf("日", "一", "二", "三", "四", "五", "六")
+private val WEEKDAY_HEADERS_MONDAY_FIRST = listOf("一", "二", "三", "四", "五", "六", "日")
 
 /** 双击判定窗口：两次点击间隔小于该值视为双击（新建/编辑事件）。 */
 private const val DOUBLE_TAP_WINDOW_MS = 400L
 
-// ═══════════════════════════════════════════════════════════════
-// CalendarPanel
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// CalendarGrid — 纯网格（无表头/无弹窗逻辑，桌面与移动端共用）
+// ═══════════════════════════════════════════════════════════
 
+/**
+ * 月历纯网格：星期表头 + 日期单元（选中/今天/事件点/活动点），
+ * 支持单击选中、双击与右键（[onEditDate]）编辑事件。
+ *
+ * @param mondayFirst 周一优先表头（一~日）；否则周日优先（日~六）。
+ * @param compactSelected 移动端样式：选中日 = 实心主色圆 + 白字。
+ */
+@Composable
+fun CalendarGrid(
+    displayedYear: Int,
+    displayedMonth: Int,
+    selectedDate: LocalDate?,
+    today: LocalDate,
+    activeDates: Set<LocalDate>,
+    events: List<CalendarEvent>,
+    mondayFirst: Boolean = false,
+    compactSelected: Boolean = false,
+    onSelectDate: (LocalDate) -> Unit,
+    onEditDate: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val days = daysInMonth(displayedYear, displayedMonth)
+    val offset = firstDayOffset(displayedYear, displayedMonth, mondayFirst)
+    val weekdayHeaders = if (mondayFirst) WEEKDAY_HEADERS_MONDAY_FIRST else WEEKDAY_HEADERS_SUNDAY_FIRST
+
+    // 事件日期 → 颜色 查找表
+    val eventDates = remember(events) { events.map { it.date }.toSet() }
+    val eventColorMap = remember(events) { events.associate { it.date to it.color } }
+
+    Column(modifier = modifier) {
+        // ── Weekday headers ──
+        Row(modifier = Modifier.fillMaxWidth()) {
+            weekdayHeaders.forEach { day ->
+                Text(
+                    text = day,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        // ── Day grid (fixed 36dp cells, no aspectRatio) ──
+        val totalCells = offset + days
+        val numRows = (totalCells + 6) / 7
+        for (row in 0 until numRows) {
+            Row(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+                for (col in 0..6) {
+                    val index = row * 7 + col
+                    val dayNum = index - offset + 1
+
+                    if (dayNum in 1..days) {
+                        val date = LocalDate(displayedYear, displayedMonth, dayNum)
+                        CalendarDayCell(
+                            dayNum = dayNum,
+                            date = date,
+                            isToday = date == today,
+                            isSelected = date == selectedDate,
+                            hasActivity = date in activeDates,
+                            hasEvent = date in eventDates,
+                            eventColorInt = eventColorMap[date] ?: 0,
+                            compactSelected = compactSelected,
+                            onClick = { onSelectDate(date) },
+                            onEdit = { onEditDate(date) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CalendarPanel — 表头导航 + 网格 + 事件图例 + 事件弹窗接线
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 完整月历卡片（桌面信息轨与移动端日历页共用）。
+ *
+ * @param compact 移动端样式：周一优先 + 选中实心圆 + 「今天」胶囊 + 事件弹窗含时间。
+ * @param mondayFirst 周一优先表头（独立于 [compact]，桌面信息轨也使用）。
+ * @param showLegend 是否在网格下方展示当月事件日图例胶囊（对齐桌面设计稿）。
+ */
 @Composable
 fun CalendarPanel(
     displayedYear: Int,
@@ -68,7 +175,7 @@ fun CalendarPanel(
     selectedDate: LocalDate?,
     today: LocalDate,
     activeDates: Set<LocalDate>,
-    events: List<com.github.hatoyuze.luogu.gui.domain.model.CalendarEvent>,
+    events: List<CalendarEvent>,
     onNavigateMonth: (Int) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     onNavigateToToday: () -> Unit,
@@ -78,13 +185,11 @@ fun CalendarPanel(
     hideOverlay: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    mondayFirst: Boolean = false,
+    showLegend: Boolean = false,
 ) {
     val isCurrentMonth = displayedYear == today.year && displayedMonth == today.month.number
-    val days = daysInMonth(displayedYear, displayedMonth)
-    val offset = firstDayOffset(displayedYear, displayedMonth, mondayFirst = compact)
     val focusRequester = remember { FocusRequester() }
-    // 移动端（compact）周一优先：一、二、三、四、五、六、日
-    val weekdayHeaders = if (compact) listOf("一", "二", "三", "四", "五", "六", "日") else WEEKDAY_HEADERS
 
     // ── Dialog state (owned by CalendarPanel, not HomeScreen) ──
     var eventDialogDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -94,10 +199,19 @@ fun CalendarPanel(
     var eventDialogAllDay by remember { mutableStateOf(false) }
     var eventDialogTimeMinutes by remember { mutableStateOf<Int?>(null) }
     var eventDialogExistingId by remember { mutableStateOf<String?>(null) }
+    // 单调递增的弹窗请求序号：即使同一天再次双击（值相等）也能重新触发效果；
+    // 遮罩关闭只清了屏幕侧 dialogContent，本状态仍持有，序号变化是唯一重启信号。
+    var eventDialogRequest by remember { mutableStateOf(0) }
 
-    // Build lookup maps from events list
-    val eventDates = remember(events) { events.map { it.date }.toSet() }
-    val eventColorMap = remember(events) { events.associate { it.date to it.color } }
+    // 当月事件日（图例用）
+    val monthEventDates = remember(events, displayedYear, displayedMonth) {
+        events
+            .filter { it.date.year == displayedYear && it.date.month.number == displayedMonth }
+            .map { it.date }
+            .distinct()
+            .sortedBy { it.toEpochDays() }
+            .take(6)
+    }
 
     // Request focus on mount for keyboard nav
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -121,13 +235,11 @@ fun CalendarPanel(
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { handleKeyEvent(it) },
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(
-                1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
-            ),
-            shadowElevation = 0.dp,
-        ) {
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        shadowElevation = 0.dp,
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // ── Header ──
             Row(
@@ -140,7 +252,8 @@ fun CalendarPanel(
                 }
 
                 Text(
-                    text = "${displayedYear}年 ${displayedMonth}月",
+                    text = if (compact) "${displayedYear}年 ${displayedMonth}月"
+                    else "📅 ${displayedYear}年 ${displayedMonth}月",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -177,56 +290,64 @@ fun CalendarPanel(
 
             Spacer(Modifier.height(8.dp))
 
-            // ── Weekday headers ──
-            Row(modifier = Modifier.fillMaxWidth()) {
-                weekdayHeaders.forEach { day ->
-                    Text(
-                        text = day,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    )
-                }
-            }
+            CalendarGrid(
+                displayedYear = displayedYear,
+                displayedMonth = displayedMonth,
+                selectedDate = selectedDate,
+                today = today,
+                activeDates = activeDates,
+                events = events,
+                mondayFirst = mondayFirst || compact,
+                compactSelected = compact,
+                onSelectDate = onSelectDate,
+                onEditDate = { date ->
+                    val existing = events.find { it.date == date }
+                    eventDialogDate = date
+                    eventDialogName = existing?.name ?: ""
+                    eventDialogColor = existing?.color ?: 0
+                    eventDialogPinned = existing?.pinned ?: false
+                    eventDialogAllDay = existing?.allDay ?: false
+                    eventDialogTimeMinutes = existing?.timeMinutes
+                    eventDialogExistingId = existing?.id
+                    eventDialogRequest++  // 每次编辑请求都触发弹窗效果（同日期再次双击也可重开）
+                },
+            )
 
-            Spacer(Modifier.height(4.dp))
-
-            // ── Day grid (fixed 36dp cells, no aspectRatio) ──
-            val totalCells = offset + days
-            val numRows = (totalCells + 6) / 7
-            for (row in 0 until numRows) {
-                Row(modifier = Modifier.fillMaxWidth().height(36.dp)) {
-                    for (col in 0..6) {
-                        val index = row * 7 + col
-                        val dayNum = index - offset + 1
-
-                        if (dayNum in 1..days) {
-                            val date = LocalDate(displayedYear, displayedMonth, dayNum)
-                            CalendarDayCell(
-                                dayNum = dayNum,
-                                isToday = date == today,
-                                isSelected = date == selectedDate,
-                                hasActivity = date in activeDates,
-                                hasEvent = date in eventDates,
-                                eventColorInt = eventColorMap[date] ?: 0,
-                                onClick = { onSelectDate(date) },
-                                onRightClick = {
-                                    val existing = events.find { it.date == date }
-                                    eventDialogDate = date
-                                    eventDialogName = existing?.name ?: ""
-                                    eventDialogColor = existing?.color ?: 0
-                                    eventDialogPinned = existing?.pinned ?: false
-                                    eventDialogAllDay = existing?.allDay ?: false
-                                    eventDialogTimeMinutes = existing?.timeMinutes
-                                    eventDialogExistingId = existing?.id
-                                },
-                                modifier = Modifier.weight(1f),
-                                compact = compact,
+            // ── 事件日图例（桌面信息轨）──
+            if (showLegend) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    monthEventDates.forEach { date ->
+                        val color = events.firstOrNull { it.date == date }?.color ?: 0
+                        val pillColor = if (color != 0) Color(color) else MaterialTheme.colorScheme.primary
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = pillColor.copy(alpha = 0.14f),
+                            modifier = Modifier.clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() },
+                            ) { onSelectDate(date) },
+                        ) {
+                            Text(
+                                text = date.day.toString(),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (color != 0) pillColor else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                             )
-                        } else {
-                            Spacer(Modifier.weight(1f))
                         }
+                    }
+                    if (monthEventDates.isNotEmpty()) {
+                        Text(
+                            "有事件",
+                            fontSize = 10.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(start = 2.dp),
+                        )
                     }
                 }
             }
@@ -234,11 +355,13 @@ fun CalendarPanel(
     }
 
     // ── Push dialog content to parent via showOverlay ──
-    LaunchedEffect(eventDialogDate) {
-        if (eventDialogDate != null && showOverlay != null) {
+    // 以请求序号为 key（而非日期值），避免「遮罩关闭后同日再次双击」因
+    // 值相等而无法重启效果。
+    LaunchedEffect(eventDialogRequest) {
+        val date = eventDialogDate
+        if (date != null && showOverlay != null) {
             // Capture values NOW — the composable lambda outlives this coroutine
             // and must not read mutable state that gets cleared on dismiss.
-            val date = eventDialogDate!!
             val name = eventDialogName
             val color = eventDialogColor
             val pinned = eventDialogPinned
@@ -254,6 +377,7 @@ fun CalendarPanel(
                 eventDialogAllDay = false
                 eventDialogTimeMinutes = null
                 eventDialogExistingId = null
+                eventDialogRequest++  // 触发效果重启 → 走 else 分支收起遮罩
             }
             showOverlay {
                 EventEditDialog(
@@ -283,23 +407,24 @@ fun CalendarPanel(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // CalendarDayCell
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun CalendarDayCell(
     dayNum: Int,
+    date: LocalDate,
     isToday: Boolean,
     isSelected: Boolean,
     hasActivity: Boolean,
     hasEvent: Boolean,
     eventColorInt: Int,
+    compactSelected: Boolean,
     onClick: () -> Unit,
-    onRightClick: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
@@ -307,13 +432,13 @@ private fun CalendarDayCell(
 
     val bgColor = when {
         hasEvent && eventColorInt != 0 -> eventColor.copy(alpha = 0.12f)
-        compact && isSelected -> primaryColor
+        compactSelected && isSelected -> primaryColor
         isToday -> primaryColor.copy(alpha = 0.12f)
         isSelected -> primaryColor.copy(alpha = 0.06f)
         else -> Color.Transparent
     }
 
-    val borderMod = if (compact && isSelected) {
+    val borderMod = if (compactSelected && isSelected) {
         Modifier
     } else if (isSelected) {
         Modifier.border(2.dp, primaryColor, CircleShape)
@@ -323,19 +448,19 @@ private fun CalendarDayCell(
 
     // 移动端选中日：实心主色圆 + 白字
     val dayTextColor = when {
-        compact && isSelected -> Color.White
+        compactSelected && isSelected -> Color.White
         isToday -> primaryColor
         else -> onSurfaceColor
     }
 
-    var lastTapMs by remember { mutableStateOf(0L) }
+    var lastTapMs by remember(date) { mutableStateOf(0L) }
     // 单调时钟基准：双击判定不受系统时间回拨（NTP/自动校时）影响
-    val monoBase = remember { TimeSource.Monotonic.markNow() }
+    val monoBase = remember(date) { TimeSource.Monotonic.markNow() }
 
     // The pointerInput coroutine below outlives recompositions; rememberUpdatedState
-    // ensures it always calls the LATEST onRightClick (whose closure captures the
+    // ensures it always calls the LATEST onEdit (whose closure captures the
     // currently displayed year/month), instead of the first composition's closure.
-    val currentOnRightClick by rememberUpdatedState(onRightClick)
+    val currentOnEdit by rememberUpdatedState(onEdit)
 
     Box(
         modifier = modifier
@@ -347,9 +472,9 @@ private fun CalendarDayCell(
             .clickable {
                 val now = monoBase.elapsedNow().inWholeMilliseconds
                 if (now - lastTapMs < DOUBLE_TAP_WINDOW_MS) {
-                    onRightClick()  // double-tap → 新建（无事件）/编辑（有事件）
+                    onEdit()  // double-tap → 新建（无事件）/编辑（有事件）
                 } else {
-                    onClick()       // single tap → select
+                    onClick() // single tap → select
                 }
                 lastTapMs = now
             }
@@ -360,7 +485,7 @@ private fun CalendarDayCell(
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
-                            currentOnRightClick()
+                            currentOnEdit()
                         }
                     }
                 }
@@ -391,9 +516,9 @@ private fun CalendarDayCell(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // LocalDate helpers
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 
 private fun LocalDate.plusDays(delta: Int): LocalDate {
     return LocalDate.fromEpochDays(this.toEpochDays() + delta)

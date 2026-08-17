@@ -144,6 +144,7 @@ kotlin {
         jvmTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
+            implementation(compose.desktop.uiTestJUnit4)
         }
     }
 }
@@ -211,4 +212,9 @@ sqldelight {
             packageName.set("com.github.hatoyuze.luogu.gui")
         }
     }
+}
+
+// 测试 JVM 透传 -Pshiromi.screenshot.dir=<dir>：HomeLayoutRenderTest 用它导出渲染 PNG。
+tasks.withType<Test>().configureEach {
+    systemProperty("shiromi.screenshot.dir", (project.findProperty("shiromi.screenshot.dir") as String?) ?: "")
 }

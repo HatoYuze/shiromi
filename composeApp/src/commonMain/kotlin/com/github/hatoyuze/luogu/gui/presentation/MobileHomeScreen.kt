@@ -1,9 +1,7 @@
 package com.github.hatoyuze.luogu.gui.presentation
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -18,14 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.domain.model.SessionType
@@ -33,34 +26,32 @@ import com.github.hatoyuze.luogu.gui.domain.model.TodoItemDomainModel
 import com.github.hatoyuze.luogu.gui.presentation.components.CalendarPanel
 import com.github.hatoyuze.luogu.gui.presentation.components.DailyProblemCard
 import com.github.hatoyuze.luogu.gui.presentation.components.ProblemDetailPage
+import com.github.hatoyuze.luogu.gui.presentation.components.home.DashedDivider
+import com.github.hatoyuze.luogu.gui.presentation.components.home.HomeContentCard
+import com.github.hatoyuze.luogu.gui.presentation.components.home.InfoPill
+import com.github.hatoyuze.luogu.gui.presentation.components.home.SearchInputBar
+import com.github.hatoyuze.luogu.gui.presentation.components.home.StreakRow
+import com.github.hatoyuze.luogu.gui.presentation.components.home.TodoInput
+import com.github.hatoyuze.luogu.gui.presentation.components.home.TodoRow
+import com.github.hatoyuze.luogu.gui.presentation.components.home.TopicProgressBar
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatEvent
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatViewModel
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel
-import com.github.hatoyuze.luogu.gui.presentation.utils.formatDue
 import com.github.hatoyuze.luogu.gui.presentation.utils.formatEventTime
+import com.github.hatoyuze.luogu.gui.presentation.utils.normalizeProblemId
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.BookOpen
-import compose.icons.feathericons.Check
-import compose.icons.feathericons.Plus
-import compose.icons.feathericons.Send
-import compose.icons.feathericons.Trash2
-import compose.icons.feathericons.Search
 import compose.icons.feathericons.Settings
-import compose.icons.feathericons.X
-import kotlin.time.Clock
+import compose.icons.feathericons.Trash2
 import kotlinx.coroutines.launch
-import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atTime
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
 
 /**
  * 手机端（Compact）首页：顶部品牌栏 + 日历/今日/待办 三 Tab 分页（可横滑）。
  *
- * 与桌面 [HomeScreen] 共享全部数据层（HomeViewModel / ChatViewModel）与
- * 卡片组件；桌面三区布局在 Expanded 下原样保留。
+ * 与桌面 [HomeScreen]（presentation.home 包）共享全部数据层（HomeViewModel /
+ * ChatViewModel）与共享原子组件（components.home：TodoInput/TodoRow/SearchInputBar/
+ * InfoPill/StreakRow/TopicProgressBar 等），视觉语言双端一致。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -213,23 +204,6 @@ private fun MobileSegmentedTabs(
 // 顶栏
 // ═══════════════════════════════════════════════════════════════
 
-/** 信息胶囊（今日页）：warm 用暖金（secondary），否则主色浅底。 */
-@Composable
-private fun InfoPill(text: String, warm: Boolean) {
-    val scheme = MaterialTheme.colorScheme
-    val bg = if (warm) scheme.secondary.copy(alpha = 0.12f) else scheme.primary.copy(alpha = 0.1f)
-    val fg = if (warm) scheme.secondary else scheme.primary
-    Surface(shape = RoundedCornerShape(12.dp), color = bg) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
-            color = fg,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-        )
-    }
-}
-
 @Composable
 private fun MobileHomeTopBar(onSettings: () -> Unit) {
     Row(
@@ -303,7 +277,7 @@ private fun CalendarPage(
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
         ) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -343,7 +317,7 @@ private fun CalendarPage(
                                 event.name,
                                 style = MaterialTheme.typography.bodyMedium,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f),
                             )
                             // 时间列（全天 / HH:mm / 未指定为空）
@@ -420,7 +394,7 @@ private fun TodayPage(
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
         ) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
@@ -460,70 +434,35 @@ private fun TodayPage(
             }
         }
 
-        // ── 每日推荐 ──
+        // ── 每日推荐（共享卡片）──
         DailyProblemCard(
             state = state.dailyProblemState,
             onRefresh = onRefreshDailyProblem,
             onViewDetail = onViewProblemDetail,
             modifier = Modifier.fillMaxWidth(),
-            compact = true,
         )
 
-        // ── 搜索（尾部按钮提交，不依赖 Enter 键）──
+        // ── 搜索（共享输入条：尾部圆形发送钮，不依赖 Enter 键）──
         var searchQuery by remember { mutableStateOf("") }
         var searchError by remember { mutableStateOf(false) }
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it; searchError = false },
-            placeholder = { Text("搜索题目编号…", fontSize = 14.sp) },
-            leadingIcon = {
-                Icon(FeatherIcons.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-            },
-            trailingIcon = {
-                val canSearch = searchQuery.isNotBlank()
-                Surface(
-                    shape = CircleShape,
-                    color = if (canSearch) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                    modifier = Modifier.padding(end = 6.dp).size(30.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clickable(
-                                enabled = canSearch,
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() },
-                            ) {
-                                val pid = searchQuery.trim()
-                                val valid = pid.startsWith("P", ignoreCase = true) || pid.all { it.isDigit() }
-                                if (pid.isBlank() || !valid) {
-                                    searchError = true
-                                } else {
-                                    searchError = false
-                                    onViewProblemDetail(pid)
-                                }
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            FeatherIcons.Send, contentDescription = "搜索",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
+        SearchInputBar(
+            query = searchQuery,
+            onQueryChange = { searchQuery = it; searchError = false },
+            onSubmit = {
+                val pid = normalizeProblemId(searchQuery)
+                if (pid == null) {
+                    searchError = true
+                } else {
+                    searchError = false
+                    onViewProblemDetail(pid)
                 }
             },
-            singleLine = true,
             isError = searchError,
-            supportingText = if (searchError) {
-                { Text("未找到该题目，请检查编号", fontSize = 12.sp) }
-            } else null,
-            shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth(),
         )
 
         // ── 学习进度 ──
-        ContentCard(title = "📊 学习进度", modifier = Modifier.fillMaxWidth()) {
+        HomeContentCard(title = "📊 学习进度", modifier = Modifier.fillMaxWidth()) {
             // 解题统计暂无写入链路时（solvedTotal=0）隐藏，避免误导
             if (state.solvedTotal > 0) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -556,9 +495,8 @@ private fun TodayPage(
     }
 }
 
-
 // ═══════════════════════════════════════════════════════════════
-// 待办页（移动端私有实现：输入行 + 到期胶囊 + 圆形复选 + 虚线分隔）
+// 待办页（共享 TodoInput/TodoRow/DashedDivider + 移动端本周概览卡）
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
@@ -615,7 +553,7 @@ private fun MobileTodoCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
     ) {
         Column(Modifier.padding(14.dp)) {
-            MobileTodoInput(onAdd = onAddTodo)
+            TodoInput(onAdd = onAddTodo)
             Spacer(Modifier.height(12.dp))
             if (todos.isEmpty()) {
                 Text(
@@ -627,195 +565,13 @@ private fun MobileTodoCard(
             } else {
                 todos.forEachIndexed { index, todo ->
                     if (index > 0) DashedDivider()
-                    MobileTodoRow(
+                    TodoRow(
                         todo = todo,
                         onToggle = { onToggleTodo(todo.id, todo.completed) },
                         onDelete = { onDeleteTodo(todo.id) },
                     )
                 }
             }
-        }
-    }
-}
-
-/** 到期日快捷计算（本地时区当天 23:59）。 */
-private fun endOfDayDue(date: LocalDate): Long =
-    date.atTime(23, 59).toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
-
-private fun todayDate(): LocalDate =
-    Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-
-private fun dueFriday(): Long {
-    var d = todayDate()
-    while (d.dayOfWeek != DayOfWeek.FRIDAY) d = LocalDate.fromEpochDays(d.toEpochDays() + 1L)
-    return endOfDayDue(d)
-}
-
-/** 到期快捷选项（key 固定；epoch 在添加时按当天解析，避免跨零点后过期）。 */
-private val DUE_OPTIONS = listOf(
-    "无期限" to "none",
-    "今天" to "today",
-    "明天" to "tomorrow",
-    "本周五" to "friday",
-)
-
-private fun resolveDueKey(key: String): Long? = when (key) {
-    "today" -> endOfDayDue(todayDate())
-    "tomorrow" -> endOfDayDue(LocalDate.fromEpochDays(todayDate().toEpochDays() + 1L))
-    "friday" -> dueFriday()
-    else -> null
-}
-
-@Composable
-private fun MobileTodoInput(onAdd: (String, Long?) -> Unit) {
-    var text by remember { mutableStateOf("") }
-    var dueKey by remember { mutableStateOf("none") }
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            placeholder = { Text("添加新待办…", fontSize = 13.sp) },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .weight(1f)
-                .onKeyEvent { event ->
-                    if (event.key == Key.Enter && event.type == KeyEventType.KeyUp && text.isNotBlank()) {
-                        onAdd(text.trim(), resolveDueKey(dueKey))
-                        text = ""; dueKey = "none"
-                        true
-                    } else false
-                },
-            textStyle = MaterialTheme.typography.bodySmall,
-        )
-        Spacer(Modifier.width(8.dp))
-        val hasText = text.isNotBlank()
-        Surface(
-            shape = CircleShape,
-            color = if (hasText) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-            modifier = Modifier.size(40.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .clickable(
-                        enabled = hasText,
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                    ) {
-                        onAdd(text.trim(), resolveDueKey(dueKey))
-                        text = ""; dueKey = "none"
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    FeatherIcons.Plus,
-                    contentDescription = "添加",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        DUE_OPTIONS.forEach { (label, key) ->
-            val selected = dueKey == key
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                ) { dueKey = key },
-            ) {
-                Text(
-                    label,
-                    fontSize = 10.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MobileTodoRow(
-    todo: TodoItemDomainModel,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val done = todo.completed
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // 圆形复选框（完成 = 实心主色 + 白勾）
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(if (done) scheme.primary else Color.Transparent)
-                .border(1.5.dp, if (done) scheme.primary else scheme.outline.copy(alpha = 0.4f), CircleShape)
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                ) { onToggle() },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (done) {
-                Icon(
-                    FeatherIcons.Check,
-                    contentDescription = "已完成",
-                    tint = scheme.onPrimary,
-                    modifier = Modifier.size(12.dp),
-                )
-            }
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(
-            todo.title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
-            color = if (done) scheme.onSurfaceVariant.copy(alpha = 0.5f) else scheme.onSurface,
-        )
-        Spacer(Modifier.width(8.dp))
-        val dueText = formatDue(todo.dueAt, todo.completed)
-        if (dueText.isNotEmpty()) {
-            Text(
-                dueText,
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant.copy(alpha = 0.55f),
-            )
-            Spacer(Modifier.width(6.dp))
-        }
-        // 删除 ✕
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                ) { onDelete() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                FeatherIcons.X,
-                contentDescription = "删除",
-                tint = scheme.onSurfaceVariant.copy(alpha = 0.35f),
-                modifier = Modifier.size(14.dp),
-            )
         }
     }
 }
@@ -848,19 +604,5 @@ private fun MobileOverviewCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
         }
-    }
-}
-
-/** 虚线分隔线（待办行间）。 */
-@Composable
-private fun DashedDivider(color: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)) {
-    Canvas(Modifier.fillMaxWidth().height(1.dp)) {
-        drawLine(
-            color = color,
-            start = Offset(0f, 0f),
-            end = Offset(size.width, 0f),
-            strokeWidth = 1.dp.toPx(),
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
-        )
     }
 }

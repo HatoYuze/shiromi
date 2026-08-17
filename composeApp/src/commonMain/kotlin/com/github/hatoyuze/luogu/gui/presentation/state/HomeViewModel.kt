@@ -2,6 +2,7 @@
 
 package com.github.hatoyuze.luogu.gui.presentation.state
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.hatoyuze.luogu.gui.data.remote.DailyProblemAgent
@@ -17,12 +18,14 @@ import kotlin.time.Instant
 // State data classes
 // ═══════════════════════════════════════════════════════════
 
+@Immutable
 data class CalendarViewState(
     val displayedYear: Int,
     val displayedMonth: Int,
     val selectedDate: LocalDate? = null,
 )
 
+@Immutable
 data class SelectedDateItems(
     val date: LocalDate,
     val sessions: List<ChatSessionDomainModel>,
@@ -57,6 +60,7 @@ class HomeViewModel(
     private val dailyProblemAgent: DailyProblemAgent,
 ) : ViewModel() {
 
+    @Immutable
     data class HomeUiState(
         // Existing
         val sessions: List<ChatSessionDomainModel> = emptyList(),

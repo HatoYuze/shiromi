@@ -12,7 +12,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "Shiromi",
-        state = rememberWindowState(width = 1500.dp, height = 1320.dp),
+        state = rememberWindowState(width = 1500.dp, height = 920.dp),
     ) {
         App(databaseWrapper)
     }

@@ -111,3 +111,28 @@ fun formatEventTime(allDay: Boolean, timeMinutes: Int?): String = when {
     timeMinutes != null -> "${(timeMinutes / 60).toPad2()}:${(timeMinutes % 60).toPad2()}"
     else -> ""
 }
+
+// ═══════════════════════════════════════════════════════════
+// 题目编号规范化（搜索框输入校验）
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 洛谷题目编号校验 + 规范化。
+ *
+ * 规则（与洛谷常见编号格式对齐）：
+ * - 去首尾空白、统一大写（洛谷 PID 区分大小写，官方均为大写）；
+ * - 纯数字（如 `1000`）原样保留；
+ * - 前缀字母 + 数字（如 `P1234`、`CF1234A`、`U1234`）保留；
+ * - 其余（如 `P`、`Problem`、`Pxyz`、空串）返回 null，视为非法。
+ *
+ * @return 规范化后的编号；非法输入返回 null。
+ */
+fun normalizeProblemId(raw: String): String? {
+    val pid = raw.trim().uppercase()
+    if (pid.isEmpty()) return null
+    // 长度上限（洛谷/CF 编号均在 12 字符内），防超长输入直达网络层
+    if (pid.length > 12) return null
+    if (pid.all { it in '0'..'9' }) return pid
+    // 前缀字母 + 数字，允许末尾题目字母（如 CF1234A）
+    return if (Regex("^[A-Z]{1,5}\\d+[A-Z]?$").matches(pid)) pid else null
+}
