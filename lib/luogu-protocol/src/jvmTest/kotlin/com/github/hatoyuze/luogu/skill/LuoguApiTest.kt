@@ -79,17 +79,34 @@ class LuoguApiTest {
     // ═══════════════ fetchLoggedInUid ═══════════════
 
     @Test fun `fetchLoggedInUid returns uid when logged in`() = runTest {
+        var url = ""
+        val api = mockApi { req ->
+            url = req.url.toString()
+            respondOk(
+                """{"instance":"main","template":"user.notification","status":200,"data":{},"user":{"uid":1825403,"name":"YUKIKY"}}""",
+            )
+        }
+        assertEquals(1825403, api.fetchLoggedInUid())
+        // 回归锚点：服务端拒绝 type=message 参数，探针 URL 不得再携带它
+        assertEquals("https://www.luogu.com.cn/user/notification?page=1&_contentOnly=1", url)
+        assertFalse(url.contains("type="))
+    }
+    @Test fun `fetchLoggedInUid falls back to legacy currentUser field`() = runTest {
         val api = mockApi {
             respondOk("""{"code":200,"currentUser":{"uid":1825403,"name":"YUKIKY"},"currentData":{}}""")
         }
         assertEquals(1825403, api.fetchLoggedInUid())
     }
-    @Test fun `fetchLoggedInUid returns null when currentUser missing`() = runTest {
-        val api = mockApi { respondOk("""{"code":200,"currentData":{}}""") }
+    @Test fun `fetchLoggedInUid falls back when user key is null`() = runTest {
+        val api = mockApi { respondOk("""{"status":200,"user":null,"currentUser":{"uid":1825403}}""") }
+        assertEquals(1825403, api.fetchLoggedInUid())
+    }
+    @Test fun `fetchLoggedInUid returns null when user missing`() = runTest {
+        val api = mockApi { respondOk("""{"instance":"main","template":"user.notification","status":200,"data":{}}""") }
         assertNull(api.fetchLoggedInUid())
     }
     @Test fun `fetchLoggedInUid returns null when uid is zero`() = runTest {
-        val api = mockApi { respondOk("""{"code":200,"currentUser":{"uid":0}}""") }
+        val api = mockApi { respondOk("""{"status":200,"user":{"uid":0}}""") }
         assertNull(api.fetchLoggedInUid())
     }
     @Test fun `fetchLoggedInUid returns null when not logged in`() = runTest {

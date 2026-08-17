@@ -6,6 +6,7 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -253,17 +254,26 @@ class LuoguApi(
      * 验证当前会话是否已登录，返回服务端确认的当前用户 UID；未登录或请求失败返回 `null`。
      *
      * 探针使用登录门槛端点 `/user/notification`：未登录返回 401/302，已登录返回 JSON
-     * 且 `currentUser.uid` 为当前登录用户。供内嵌浏览器登录后验证提取的 Cookie 使用。
+     * 且 `user.uid` 为当前登录用户（旧版响应用 `currentUser.uid`，一并兼容）。
+     * 供内嵌浏览器登录后验证提取的 Cookie 使用。
+     *
+     * 注意：2026-08 起服务端拒绝 `type=message` 查询参数（404 Invalid query parameter
+     * "type"），因此不再携带该参数。
      */
     suspend fun fetchLoggedInUid(): Int? {
         return try {
             val raw = http.getRaw(
-                "/user/notification?type=message&page=1&_contentOnly=1",
+                "/user/notification?page=1&_contentOnly=1",
                 referer = "https://www.luogu.com.cn/",
             )
             val root = LuoguHttpClient.json.parseToJsonElement(raw).jsonObject
-            val currentUser = root["currentUser"]?.jsonObject ?: return null
-            currentUser["uid"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()?.takeIf { it > 0 }
+            // 逐键安全回退：`jsonObject` 是强制转换，`"user": null` 时
+            // `root["user"]` 为非空 JsonNull 会抛异常，必须用 `as?` 转换，
+            // 才能在没有 `user` 对象时落到旧版 `currentUser` 字段。
+            val user = root["user"] as? JsonObject ?: root["currentUser"] as? JsonObject ?: return null
+            user["uid"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()?.takeIf { it > 0 }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e // 协程取消必须向上传播，不能被当作“未登录”吞掉
         } catch (_: Exception) {
             null
         }
