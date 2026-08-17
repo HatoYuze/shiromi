@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import com.github.hatoyuze.luogu.gui.config.ConfigService
 import com.github.hatoyuze.luogu.gui.data.local.DatabaseWrapper
 import com.github.hatoyuze.luogu.gui.di.commonModule
 import com.github.hatoyuze.luogu.gui.di.platformModule
@@ -21,6 +22,7 @@ import com.github.hatoyuze.luogu.gui.presentation.MobileHomeScreen
 import com.github.hatoyuze.luogu.gui.presentation.SettingsScreen
 import com.github.hatoyuze.luogu.gui.presentation.adaptive.PlatformSizeClass
 import com.github.hatoyuze.luogu.gui.presentation.adaptive.calculatePlatformSizeClass
+import com.github.hatoyuze.luogu.gui.presentation.onboarding.OnboardingScreen
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatViewModel
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel
 import com.github.hatoyuze.luogu.gui.theme.LuoguTheme
@@ -44,6 +46,16 @@ fun App(databaseWrapper: DatabaseWrapper) {
 
 @Composable
 private fun AppNav() {
+    // 启动引导：apiKey 或 luoguCookie 为空时先完成配置（本次会话内可跳过/完成一次）。
+    var onboardingFinished by rememberSaveable { mutableStateOf(false) }
+    val needsOnboarding = !onboardingFinished &&
+        (ConfigService.apiKey.isBlank() || ConfigService.luoguCookie.isBlank())
+
+    if (needsOnboarding) {
+        OnboardingScreen(onDone = { onboardingFinished = true })
+        return
+    }
+
     when (calculatePlatformSizeClass()) {
         PlatformSizeClass.Expanded -> DesktopNav()
         PlatformSizeClass.Compact -> MobileNav()
