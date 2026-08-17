@@ -40,6 +40,13 @@ these local projects.
    (host == domain or `"." + domain` suffix), not substring. `platform-linux/...` checks
    the `gtk_run_on_thread_sync` return value so a stopped GTK runtime cannot leave the
    promise unresolved.
+5. (iOS cross-compilation on non-macOS hosts) `core/build.gradle.kts` gates the iOS
+   cinterop (`protocol.def`, needs the Apple SDK) to macOS hosts only; on other hosts
+   `core/src/iosStubMain/` supplies signature-identical API stubs
+   (`WebViewPlatformConfig`, `defaultPlatformConfig`, `rememberWebViewController`,
+   `WebView` — all throw at runtime) so the iOS klibs can be cross-compiled by
+   Kotlin/Native on Linux/Windows for compile-level verification. Real iOS builds and
+   all publishing must run on macOS (publish tasks fail fast on non-macOS hosts).
 
 ## How it is consumed
 
@@ -50,7 +57,9 @@ these local projects.
   (`platform-windows` / `platform-macos` / `platform-linux`) at configuration time.
 - Android: `commonMain` depends on `core` only; the app reads cookies via
   `android.webkit.CookieManager` directly (no native change needed).
-- iOS: not yet wired (falls back to `document.cookie` + manual paste).
+- iOS: native cookie read not yet wired (falls back to `document.cookie` + manual paste).
+  Note: on non-macOS hosts the iOS klib is an API stub (`src/iosStubMain`, see local
+  change #5 above) — real iOS builds must run on macOS.
 - The Kotlin plugin's `kmpPartiallyResolvedDependenciesChecker` emits warnings that the
   android variant of `core` is unresolved — a false positive of the AGP KMP plugin in a
   composite build; `:wvbridge:core:compileAndroidMain` compiles fine and the task
