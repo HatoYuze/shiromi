@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Shiromi 桌面端首页布局重设计 · 三版方案（保留侧栏）</title>
+<style>
+  :root {
+    --page:#E8E5DC; --scr:#F7F4EC; --card:#FFFFFF; --bd:#E6E0D2;
+    --pri:#4A5599; --tint:#EAEDF8; --txt:#2B2A33; --sub:#8B8778;
+    --faint:#B4AF9E; --warm:#D98F68; --warmT:#B26B43; --warmBg:#F6E8DD;
+    --dim:#CFCABB; --dash:#EFEAE0; --side:#F4F1E9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--page); font: 14px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; color: var(--txt); padding-bottom: 60px; }
+  .wrap { max-width: 1260px; margin: 0 auto; }
+  .page-title { text-align: center; padding: 26px 0 6px; font-size: 21px; font-weight: 800; color:#4B4636; }
+  .page-sub { text-align: center; font-size: 12.5px; color:#7D7968; margin-bottom: 22px; }
+  .sec { margin-top: 34px; }
+  .sec-head { display:flex; align-items:baseline; gap:12px; padding: 0 6px; margin-bottom: 12px; }
+  .sec-tag { font-size: 12px; font-weight: 800; color:#fff; background: var(--pri); border-radius: 8px; padding: 3px 10px; white-space:nowrap; }
+  .sec-title { font-size: 16px; font-weight: 800; color:#4B4636; }
+  .sec-desc { font-size: 12.5px; color:#7D7968; }
+  .win { width: 1180px; margin: 0 auto 26px; border-radius: 16px; overflow: hidden; background: var(--scr);
+         border: 1px solid #D6D0BF; box-shadow: 0 10px 34px rgba(60,50,20,.16); }
+  .win-cap { text-align:center; font-size:12px; color:#7D7968; margin: 2px auto 20px; max-width: 1000px; line-height:1.7; }
+  .titlebar { height: 40px; background:#FDFBF7; border-bottom:1px solid var(--bd); display:flex; align-items:center; padding:0 16px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; }
+  .dot.r{background:#FF5F57}.dot.y{background:#FEBC2E}.dot.g{background:#28C840}
+  .ttl { font-size:12px; color:var(--sub); margin-left:8px; }
+  .ic { display:inline-block; vertical-align:middle; }
+  .ic svg { display:block; }
+  .badge { width:32px; height:32px; border-radius:50%; background:var(--tint); color:var(--pri);
+           display:flex; align-items:center; justify-content:center; }
+  .brand { font-size:16px; font-weight:800; color:var(--pri); margin-left:11px; }
+  .spacer { flex:1; }
+  .btn-tint { background:var(--tint); color:var(--pri); border:none; border-radius:12px; font-size:13px; font-weight:700;
+              padding:9px 18px; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  .btn-circle { width:36px; height:36px; border-radius:50%; background:var(--pri); color:#fff; border:none;
+                display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:16px; }
+  .pill { display:inline-flex; align-items:center; gap:4px; border-radius:12px; padding:4px 10px; font-size:11.5px; font-weight:700; }
+  .pill.warm { background:var(--warmBg); color:var(--warmT); }
+  .pill.pri  { background:var(--tint); color:var(--pri); }
+  .tag { display:inline-flex; border-radius:8px; background:#F1EEE6; color:#7D7968; font-size:10.5px; padding:3px 8px; }
+  .hint { font-size:10.5px; color:var(--faint); }
+  .dash-line { border-top: 1px dashed var(--dim); margin: 10px 0; }
+  .bar { height:9px; border-radius:5px; background:var(--dash); overflow:hidden; }
+  .bar > i { display:block; height:100%; border-radius:5px; background:var(--pri); }
+  .seg { display:flex; gap:4px; background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:4px; width:fit-content; }
+  .seg .t { text-align:center; padding:9px 22px; border-radius:9px; font-size:13.5px; color:var(--sub); cursor:pointer; }
+  .seg .t.on { background:var(--tint); color:var(--pri); font-weight:800; }
+  .ev-row { display:flex; align-items:center; gap:10px; padding:7px 0; font-size:12.5px; }
+  .ev-dot { width:10px; height:10px; border-radius:3px; flex:none; }
+  .ev-time { margin-left:auto; color:var(--faint); font-size:11px; }
+  .todo-row { display:flex; align-items:center; gap:10px; padding:6px 0; font-size:12.5px; }
+  .todo-row .ckb { width:16px; height:16px; border-radius:50%; border:1.5px solid #C9C4B4; flex:none; display:flex; align-items:center; justify-content:center; color:#fff; }
+  .todo-row.done .ckb { background:var(--pri); border-color:var(--pri); }
+  .todo-row.done .tx { color:var(--faint); text-decoration:line-through; }
+  .todo-row .due { margin-left:auto; color:var(--faint); font-size:10.5px; }
+  .todo-row .x { color:var(--dim); font-size:11px; cursor:pointer; }
+  .prog-h { display:flex; align-items:center; justify-content:space-between; font-size:12.5px; }
+  .prog-h .pct { color:var(--pri); font-weight:800; }
+  .inputbar { display:flex; align-items:center; gap:10px; background:var(--card); border:1.5px solid var(--bd);
+              border-radius:14px; padding:6px 7px 6px 15px; }
+  .inputbar .ph { flex:1; color:var(--faint); font-size:12.5px; }
+  .sidebar { width:264px; background:var(--side); border-right:1px solid var(--bd); display:flex; flex-direction:column; padding:18px 14px; flex:none; }
+  .side-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; color:var(--txt);
+               font-size:13px; cursor:pointer; }
+  .side-item:hover { background:rgba(0,0,0,.04); }
+  .side-item.on { background:var(--tint); color:var(--pri); font-weight:700; }
+  .side-item .del { margin-left:auto; color:var(--dim); font-size:11px; }
+  .sec-label { font-size:11.5px; color:var(--sub); font-weight:700; padding: 0 12px; margin: 12px 0 6px; }
+  .card-title { font-size:13.5px; font-weight:800; display:flex; align-items:center; }
+  .card-title .r { margin-left:auto; display:inline-flex; align-items:center; color:var(--sub); }
+  .grid-date { width:28px; height:28px; line-height:28px; margin:auto; border-radius:50%; background:var(--pri); color:#fff; font-weight:800; }
+  .cdate { padding:4px 0; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-title">Shiromi · 桌面首页布局重设计（保留侧栏）</div>
+  <div class="page-sub">三个方案侧栏完全一致 · 仅首页主内容区排列不同 · 全组件沿用移动端卡片语言（暖米底 / 白卡片 / 藏蓝主色 / 暖金胶囊）· 深色模式自动适配</div>
+
+  <!-- ═══════════ 布局 1 ═══════════ -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-tag">布局 1</span>
+      <span class="sec-title">网格仪表盘（Grid）</span>
+      <span class="sec-desc">首页 = 2 列卡片网格，6 张卡一屏尽览；去掉底部进度/待办条，全部信息平铺。信息密度高、扫读快。</span>
+    </div>
+    <div class="win">
+      <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ttl">Shiromi — 首页</span></div>
+      <div style="display:flex; min-height:660px;">
+        <div class="sidebar" id="sidebar-1"></div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:18px; padding:22px;">
+          <!-- 行1 -->
+          <div style="display:flex; gap:18px;">
+            <div class="card" style="flex:1.15; padding:18px;">
+              <div class="card-title"><span>📅 日历</span><span class="r"><span class="pill pri" style="padding:2px 9px; font-size:10.5px;">今天</span></span></div>
+              <div style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:10.5px; color:var(--faint); margin:10px 0 4px;">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(7,1fr); row-gap:2px; text-align:center; font-size:12px;">
+                <span class="cdate" style="color:var(--dim);">27</span><span class="cdate" style="color:var(--dim);">28</span><span class="cdate" style="color:var(--dim);">29</span><span class="cdate" style="color:var(--dim);">30</span><span class="cdate" style="color:var(--dim);">31</span><span class="cdate">1</span><span class="cdate">2</span>
+                <span class="cdate">3</span><span class="cdate">4</span><span class="cdate">5</span><span class="cdate">6</span><span class="cdate">7</span><span class="cdate">8</span><span class="cdate">9</span>
+                <span class="cdate">10</span><span class="cdate">11</span><span class="cdate">12</span><span class="cdate">13</span><span class="cdate">14</span><span class="cdate">15</span><span><span class="grid-date">16</span></span>
+                <span class="cdate">17</span><span class="cdate">18</span><span class="cdate">19</span><span class="cdate">20</span><span class="cdate">21</span><span class="cdate">22</span><span class="cdate">23</span>
+                <span class="cdate">24</span><span class="cdate">25</span><span class="cdate">26</span><span class="cdate">27</span><span class="cdate">28</span><span class="cdate">29</span><span class="cdate">30</span>
+                <span class="cdate">31</span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+            <div class="card" style="flex:1; padding:18px; display:flex; flex-direction:column;">
+              <div style="font-size:40px; font-weight:800; line-height:1;">16</div>
+              <div style="margin-top:6px; font-size:12.5px; color:var(--sub);">八月 · 周六 · 2026</div>
+              <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
+                <span class="pill warm">🔥 连续 12 天</span>
+                <span class="pill pri">2 个事件</span>
+              </div>
+              <div style="flex:1;"></div>
+              <div style="font-size:26px; color:var(--faint); opacity:.75;">(ﾉ´▽`)ﾉ</div>
+              <div style="margin-top:6px; font-size:12.5px; color:var(--faint);">今天也要加油刷题呀！</div>
+            </div>
+          </div>
+          <!-- 行2 -->
+          <div style="display:flex; gap:18px;">
+            <div class="card" style="flex:1; padding:18px;">
+              <div class="card-title"><span>每日推荐</span><span class="r" id="i-refresh1"></span></div>
+              <div style="margin-top:10px; font-size:14px; font-weight:800;">P1234 数列分段 Section II</div>
+              <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                <span class="pill warm">提高+</span><span class="tag">#贪心</span><span class="tag">#动态规划</span><span class="tag">#排序</span>
+              </div>
+              <div style="margin-top:10px; font-size:12px; color:#6F6B5D; line-height:1.6;">结合你近期「区间DP」的正确率，推荐这道分段最优化题，先想 O(n²) 再尝试优化到 O(n log n)。</div>
+              <div style="text-align:right; margin-top:8px; font-size:12px; color:var(--pri); font-weight:700;">查看详情 ›</div>
+            </div>
+            <div class="card" style="flex:1; padding:18px;">
+              <div class="card-title"><span>📊 学习进度</span></div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12.5px;">
+                <span>🔥</span><span style="color:var(--sub);">连续打卡</span><span style="font-size:17px; font-weight:800; color:var(--warmT);">12</span><span style="color:var(--sub);">天</span>
+              </div>
+              <div style="margin-top:12px;" class="prog-h"><span style="color:var(--sub);">本周主题：动态规划</span><span class="pct">62%</span></div>
+              <div class="bar" style="margin-top:7px;"><i style="width:62%;"></i></div>
+              <div style="margin-top:8px; font-size:11px; color:var(--faint);">12/20 题 · 继续加油！</div>
+            </div>
+          </div>
+          <!-- 行3 -->
+          <div style="display:flex; gap:18px;">
+            <div class="card" style="flex:1; padding:16px 18px;">
+              <div class="inputbar"><span class="ic" style="color:var(--faint)" id="i-search1"></span><span class="ph">输入题目编号搜索…</span><button class="btn-circle" style="width:30px; height:30px;" id="i-send1"></button></div>
+            </div>
+            <div class="card" style="flex:1; padding:18px;">
+              <div class="card-title"><span>📋 待办</span><span class="r hint">2/3 完成</span></div>
+              <div style="margin-top:8px;">
+                <div class="todo-row done"><span class="ckb" id="i-check1"></span><span class="tx">补线段树总结</span><span class="due">今天</span></div>
+                <div class="todo-row"><span class="ckb"></span><span class="tx">注册 CF div2 比赛</span><span class="due">周五 22:35</span><span class="x" id="i-x1"></span></div>
+                <div class="todo-row"><span class="ckb"></span><span class="tx">P1234 写完并提交</span><span class="due">今日</span><span class="x" id="i-x2"></span></div>
+              </div>
+              <div style="margin-top:8px; text-align:right; font-size:12px; color:var(--pri); font-weight:700;">查看全部 ›</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="win-cap">布局 1 · 网格仪表盘：6 卡 3 行（日历+日期 / 每日推荐+学习进度 / 搜索+待办），无底部条，所有信息一屏可见；适合信息密度优先</div>
+  </div>
+
+  <!-- ═══════════ 布局 2 ═══════════ -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-tag">布局 2</span>
+      <span class="sec-title">分段 Tab 分页（Tabs）</span>
+      <span class="sec-desc">首页主区 = 移动端同款胶囊 Tab（日历 / 今日 / 待办），一次展示一个宽屏页面；观感与移动端最一致，聚焦不拥挤。</span>
+    </div>
+    <div class="win">
+      <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ttl">Shiromi — 首页 · 今日</span></div>
+      <div style="display:flex; min-height:660px;">
+        <div class="sidebar" id="sidebar-2"></div>
+        <div style="flex:1; display:flex; flex-direction:column; padding:22px; gap:18px;">
+          <div class="seg">
+            <div class="t">日历</div><div class="t on">今日</div><div class="t">待办</div>
+          </div>
+          <!-- 今日 pane -->
+          <div style="display:flex; align-items:center; gap:14px; padding: 2px 6px;">
+            <div style="font-size:44px; font-weight:800; line-height:1;">16</div>
+            <div>
+              <div style="font-size:13px; color:var(--sub);">八月 · 周六</div>
+              <div style="font-size:10.5px; color:var(--faint);">2026</div>
+            </div>
+            <span class="spacer"></span>
+            <div style="font-size:22px; color:var(--faint);">(´｡• ᵕ •｡`)</div>
+            <span class="pill warm">🔥 连续 12 天</span>
+            <span class="pill pri">2 个事件</span>
+          </div>
+          <div class="card" style="padding:20px;">
+            <div class="card-title"><span>每日推荐</span><span class="r" id="i-refresh2"></span></div>
+            <div style="margin-top:12px; font-size:15px; font-weight:800;">P1234 数列分段 Section II</div>
+            <div style="display:flex; gap:6px; margin-top:9px; flex-wrap:wrap;">
+              <span class="pill warm">提高+</span><span class="tag">#贪心</span><span class="tag">#动态规划</span><span class="tag">#排序</span>
+            </div>
+            <div style="margin-top:12px; font-size:12.5px; color:#6F6B5D; line-height:1.7; max-width:720px;">
+              结合你近期「区间DP」的正确率，推荐这道分段最优化题，先想 O(n²) 再尝试优化到 O(n log n)。完成后再来一道同知识点的巩固题吧。
+            </div>
+            <div style="text-align:right; margin-top:10px; font-size:12.5px; color:var(--pri); font-weight:700;">查看详情 ›</div>
+          </div>
+          <div style="display:flex; gap:18px; flex:1;">
+            <div class="card" style="flex:1; padding:16px 18px; align-self:flex-start;">
+              <div class="inputbar"><span class="ic" style="color:var(--faint)" id="i-search2"></span><span class="ph">输入题目编号搜索…</span><button class="btn-circle" style="width:30px; height:30px;" id="i-send2"></button></div>
+            </div>
+            <div class="card" style="flex:1.2; padding:18px; align-self:flex-start;">
+              <div class="card-title"><span>📊 学习进度</span><span class="r hint">本周主题</span></div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12.5px;">
+                <span>🔥</span><span style="color:var(--sub);">连续打卡</span><span style="font-size:17px; font-weight:800; color:var(--warmT);">12</span><span style="color:var(--sub);">天</span>
+              </div>
+              <div style="margin-top:12px;" class="prog-h"><span style="color:var(--sub);">动态规划</span><span class="pct">62%</span></div>
+              <div class="bar" style="margin-top:7px;"><i style="width:62%;"></i></div>
+              <div style="margin-top:8px; font-size:11px; color:var(--faint);">12/20 题 · 继续加油！</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="win-cap">布局 2 · 分段 Tab：上图展示「今日」pane（大日期 + 每日推荐 + 搜索 + 学习进度）；「日历」pane = 大日历 + 当日事件双卡；「待办」pane = 待办列表 + 本周概览</div>
+  </div>
+
+  <!-- ═══════════ 布局 3 ═══════════ -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-tag">布局 3</span>
+      <span class="sec-title">主次双列（Focus + Rail）</span>
+      <span class="sec-desc">首页 = 学习主列（每日推荐 + 学习进度 + 搜索）+ 右侧窄信息轨（迷你日历 + 待办预览）。聚焦学习目标，桌面生产力布局。</span>
+    </div>
+    <div class="win">
+      <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ttl">Shiromi — 首页</span></div>
+      <div style="display:flex; min-height:660px;">
+        <div class="sidebar" id="sidebar-3"></div>
+        <div style="flex:1; display:flex; gap:18px; padding:22px;">
+          <!-- 主列 -->
+          <div style="flex:1.45; display:flex; flex-direction:column; gap:18px;">
+            <div class="card" style="padding:20px;">
+              <div class="card-title"><span>每日推荐</span><span class="r" id="i-refresh3"></span></div>
+              <div style="margin-top:12px; font-size:15px; font-weight:800;">P1234 数列分段 Section II</div>
+              <div style="display:flex; gap:6px; margin-top:9px; flex-wrap:wrap;">
+                <span class="pill warm">提高+</span><span class="tag">#贪心</span><span class="tag">#动态规划</span><span class="tag">#排序</span>
+              </div>
+              <div style="margin-top:12px; font-size:12.5px; color:#6F6B5D; line-height:1.7;">结合你近期「区间DP」的正确率，推荐这道分段最优化题，先想 O(n²) 再尝试优化到 O(n log n)。</div>
+              <div style="text-align:right; margin-top:10px; font-size:12.5px; color:var(--pri); font-weight:700;">查看详情 ›</div>
+            </div>
+            <div class="card" style="padding:20px;">
+              <div class="card-title"><span>📊 学习进度</span><span class="r hint">本周主题：动态规划</span></div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12.5px;">
+                <span>🔥</span><span style="color:var(--sub);">连续打卡</span><span style="font-size:17px; font-weight:800; color:var(--warmT);">12</span><span style="color:var(--sub);">天</span>
+              </div>
+              <div style="margin-top:12px;" class="prog-h"><span style="color:var(--sub);">动态规划 62%</span><span class="pct">12 / 20 题</span></div>
+              <div class="bar" style="margin-top:7px;"><i style="width:62%;"></i></div>
+              <div style="margin-top:8px; font-size:11px; color:var(--faint);">继续加油，字符串专题快完成了！</div>
+            </div>
+            <div class="card" style="padding:16px 20px; display:flex; align-items:center; gap:12px; flex:1;">
+              <span class="ic" style="color:var(--faint)" id="i-search3"></span>
+              <span style="flex:1; font-size:13px; color:var(--faint);">输入题目编号搜索…</span>
+              <button class="btn-circle" id="i-send3"></button>
+              <span style="margin:0 6px; height:24px; border-left:1px dashed var(--dim);"></span>
+              <span style="font-size:24px; color:var(--faint); opacity:.75;">(´｡• ᵕ •｡`)</span>
+            </div>
+          </div>
+          <!-- 信息轨 -->
+          <div style="width:312px; flex:none; display:flex; flex-direction:column; gap:18px;">
+            <div class="card" style="padding:18px;">
+              <div class="card-title" style="font-size:12.5px;"><span>📅 8月</span><span class="r"><span class="pill pri" style="padding:2px 8px; font-size:10px;">今天</span></span></div>
+              <div style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:10px; color:var(--faint); margin:10px 0 4px;">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(7,1fr); row-gap:2px; text-align:center; font-size:11px;">
+                <span class="cdate" style="color:var(--dim);">27</span><span class="cdate" style="color:var(--dim);">28</span><span class="cdate" style="color:var(--dim);">29</span><span class="cdate" style="color:var(--dim);">30</span><span class="cdate" style="color:var(--dim);">31</span><span class="cdate">1</span><span class="cdate">2</span>
+                <span class="cdate">3</span><span class="cdate">4</span><span class="cdate">5</span><span class="cdate">6</span><span class="cdate">7</span><span class="cdate">8</span><span class="cdate">9</span>
+                <span class="cdate">10</span><span class="cdate">11</span><span class="cdate">12</span><span class="cdate">13</span><span class="cdate">14</span><span class="cdate">15</span><span><span class="grid-date" style="width:22px; height:22px; line-height:22px;">16</span></span>
+                <span class="cdate">17</span><span class="cdate">18</span><span class="cdate">19</span><span class="cdate">20</span><span class="cdate">21</span><span class="cdate">22</span><span class="cdate">23</span>
+                <span class="cdate">24</span><span class="cdate">25</span><span class="cdate">26</span><span class="cdate">27</span><span class="cdate">28</span><span class="cdate">29</span><span class="cdate">30</span>
+                <span class="cdate">31</span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+                <span class="pill warm" style="font-size:10px; padding:2px 8px;">3</span>
+                <span class="pill pri" style="font-size:10px; padding:2px 8px;">9</span>
+                <span class="pill pri" style="font-size:10px; padding:2px 8px;">21</span>
+                <span class="pill warm" style="font-size:10px; padding:2px 8px;">28</span>
+                <span class="hint" style="align-self:center;">有事件</span>
+              </div>
+            </div>
+            <div class="card" style="padding:18px;">
+              <div class="card-title" style="font-size:12.5px;"><span>📋 待办</span><span class="r hint">2/3</span></div>
+              <div style="margin-top:8px;">
+                <div class="todo-row done" style="font-size:12px;"><span class="ckb" id="i-check2"></span><span class="tx">补线段树总结</span></div>
+                <div class="todo-row" style="font-size:12px;"><span class="ckb"></span><span class="tx">注册 CF div2 比赛</span><span class="due">周五</span></div>
+                <div class="todo-row" style="font-size:12px;"><span class="ckb"></span><span class="tx">P1234 写完并提交</span><span class="due">今日</span></div>
+              </div>
+              <div style="margin-top:8px; text-align:right; font-size:12px; color:var(--pri); font-weight:700;">查看全部 ›</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="win-cap">布局 3 · 主次双列：学习主列（推荐/进度/搜索）+ 窄信息轨（迷你日历/待办预览）；桌面生产力布局，主次分明、信息最聚焦</div>
+  </div>
+
+  <!-- ═══════════ 聊天页参考 ═══════════ -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-tag">参考</span>
+      <span class="sec-title">聊天页（三方案共用，保持侧栏）</span>
+      <span class="sec-desc">首页布局选定后，聊天页统一采用此样式：会话侧栏 + 移动端消息卡（思考折叠行 / 常显操作条 / AskUser / 圆形发送）。</span>
+    </div>
+    <div class="win">
+      <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ttl">Shiromi — 对话</span></div>
+      <div style="display:flex; min-height:560px;">
+        <div class="sidebar" id="sidebar-4" style="width:236px;"></div>
+        <div style="flex:1; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; padding:12px 22px; border-bottom:1px solid var(--bd);">
+            <div style="font-size:14px; font-weight:800;">P1234 题解讨论</div>
+            <div style="margin-left:10px; font-size:10.5px; color:var(--faint);">COACH · 12 条消息</div>
+            <span class="spacer"></span>
+            <span class="ic" style="color:var(--sub)" id="i-moon"></span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:12px; padding:20px 24px; flex:1; position:relative; max-width:860px; margin:0 auto; width:100%;">
+            <div style="background:var(--pri); color:#fff; border-radius:16px 16px 4px 16px; padding:11px 15px; max-width:62%; font-size:13px; line-height:1.55; align-self:flex-end;">
+              这题我只会暴力，怎么优化到 O(n log n)？
+            </div>
+            <div style="background:#F4F1E9; border-radius:9px; padding:7px 12px; font-size:11.5px; color:var(--sub); align-self:flex-start;">
+              <span class="ic" style="color:var(--sub); margin-right:4px;" id="i-chev"></span>思考过程 · 42 token（点击展开）
+            </div>
+            <div style="background:var(--card); border:1px solid var(--bd); border-radius:16px 16px 16px 4px; padding:14px 16px; max-width:78%; font-size:13px; line-height:1.6; align-self:flex-start;">
+              先观察「分段代价」的单调性，可以二分答案；再证明决策单调性后用单调队列优化……<br>
+              <div style="font-family:'Cambria Math','Times New Roman',serif; color:var(--pri); font-weight:600; margin:6px 0;">f[i] = min(f[j] + w(j+1, i))</div>
+              <div style="font-size:10px; color:var(--faint); margin-top:8px;">已发送 · 1.2k token</div>
+            </div>
+            <div style="display:flex; gap:6px; align-self:flex-start; margin-top:-4px;">
+              <span class="act" id="i-edit"></span><span class="act" id="i-redo"></span><span class="act" id="i-copy"></span><span class="act" id="i-trash"></span>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <span class="pill pri" style="font-size:11px; padding:4px 11px;"><span class="ic" id="i-checkc" style="margin-right:5px;"></span>动态规划专项</span>
+              <span class="pill" style="background:#F4F1E9; border:1px solid var(--bd); color:#7D7968; font-size:11px; padding:4px 11px;">注册比赛</span>
+              <span class="pill" style="background:#F4F1E9; border:1px solid var(--bd); color:#7D7968; font-size:11px; padding:4px 11px;">线段树</span>
+            </div>
+            <div style="position:absolute; left:24px; right:24px; bottom:16px; display:flex; align-items:center; gap:10px;">
+              <div class="inputbar"><span class="ph">输入消息…</span></div>
+              <button class="btn-circle" id="i-send"></button>
+            </div>
+          </div>
+          <div style="height:66px;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="win-cap">聊天页参考：窄会话侧栏（236px）+ 居中消息列 + 底部输入条；与当前聊天页同构，仅替换组件样式</div>
+  </div>
+</div>
+
+<script>
+// ── Feather 风格图标 ──
+const I = {
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  cpu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>',
+  msg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.9.7 1.5 1.7 1.8 2.8h4.4c.3-1.1.9-2.1 1.8-2.8A7 7 0 0 0 12 2z"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
+  redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'
+};
+const ic = (name,size)=>'<span class="ic" style="width:'+(size||15)+'px;height:'+(size||15)+'px;">'+I[name]+'</span>';
+function inject(id, name, size){ const el=document.getElementById(id); if(!el) return; el.insertAdjacentHTML('afterbegin', I[name]); const s=el.querySelector('svg'); s.style.width=(size||16)+'px'; s.style.height=(size||16)+'px'; el.classList.add('ic'); }
+// ── 共用侧栏（三方案一致）──
+const sidebar = (brandSize, activeFirst) => `
+  <div style="display:flex; align-items:center; padding:0 4px;">
+    ${ic('book',20).replace('class="ic"','class="ic" style="width:20px;height:20px;"')}
+    <span class="brand" style="font-size:${brandSize}px; margin-left:11px;">Shiromi</span>
+  </div>
+  <div style="height:20px;"></div>
+  <button class="btn-tint" style="justify-content:center; width:100%;"><span class="ic" style="width:15px;height:15px;">${I.plus}</span>新对话</button>
+  <div style="height:8px;"></div>
+  <button class="btn-tint" style="justify-content:center; width:100%; background:var(--warmBg); color:var(--warmT);"><span class="ic" style="width:15px;height:15px;">${I.cpu}</span>新教练</button>
+  <div class="sec-label">会话历史</div>
+  <div class="side-item on"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>P1234 题解讨论<span class="del">✕</span></div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>动态规划专项训练</div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>数学复习计划</div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>图论最短路答疑</div>
+  <div style="flex:1;"></div>
+  <div class="dash-line"></div>
+  <div class="side-item" style="color:var(--sub);"><span class="ic" style="width:15px;height:15px;">${I.light}</span>💡 推荐<span style="margin-left:auto; font-size:11px;">▸</span></div>
+  <div class="side-item" style="color:var(--sub);"><span class="ic" style="width:15px;height:15px;">${I.gear}</span>设置</div>
+`;
+document.getElementById('sidebar-1').innerHTML = sidebar(16, true);
+document.getElementById('sidebar-2').innerHTML = sidebar(16, true);
+document.getElementById('sidebar-3').innerHTML = sidebar(16, true);
+document.getElementById('sidebar-4').innerHTML = sidebar(14.5, true).replace('<div style="height:20px;"></div>','<div style="height:14px;"></div>');
+// ── 图标注入 ──
+inject('i-refresh1','refresh',14); inject('i-search1','search',15); inject('i-send1','send',13);
+inject('i-check1','check',8); inject('i-x1','x',10); inject('i-x2','x',10);
+inject('i-refresh2','refresh',14); inject('i-search2','search',15); inject('i-send2','send',13);
+inject('i-refresh3','refresh',14); inject('i-search3','search',16); inject('i-send3','send',15);
+inject('i-check2','check',8);
+inject('i-moon','moon',17); inject('i-chev','chev',10); inject('i-checkc','check',8);
+inject('i-edit','edit',12); inject('i-redo','redo',12); inject('i-copy','copy',12); inject('i-trash','trash',12);
+inject('i-send','send',16);
+// 操作条文字
+['i-edit','i-redo','i-copy','i-trash'].forEach((id,i)=>{
+  const el=document.getElementById(id);
+  const label=['编辑','重试','复制','删除'][i];
+  el.insertAdjacentHTML('beforeend','<span style="margin-left:5px;">'+label+'</span>');
+  el.style.cssText='display:inline-flex; align-items:center; gap:5px; background:#F4F1E9; border-radius:13px; padding:5px 11px; font-size:11px; color:#6F6B5D; font-weight:700;';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<!-- saved from url=(0061)file:///F:/tmp/android_debug/desktop-home-layout-refined.html -->
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<title>Shiromi 布局 3 优化版 · 主次双列（均衡）</title>
+<style>
+  :root {
+    --page:#E8E5DC; --scr:#F7F4EC; --card:#FFFFFF; --bd:#E6E0D2;
+    --pri:#4A5599; --tint:#EAEDF8; --txt:#2B2A33; --sub:#8B8778;
+    --faint:#B4AF9E; --warm:#D98F68; --warmT:#B26B43; --warmBg:#F6E8DD;
+    --dim:#CFCABB; --dash:#EFEAE0; --side:#F4F1E9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--page); font: 14px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; color: var(--txt); padding-bottom: 60px; }
+  .wrap { max-width: 1260px; margin: 0 auto; }
+  .page-title { text-align: center; padding: 26px 0 6px; font-size: 21px; font-weight: 800; color:#4B4636; }
+  .page-sub { text-align: center; font-size: 12.5px; color:#7D7968; margin-bottom: 22px; }
+  .sec { margin-top: 34px; }
+  .sec-head { display:flex; align-items:baseline; gap:12px; padding: 0 6px; margin-bottom: 12px; }
+  .sec-tag { font-size: 12px; font-weight: 800; color:#fff; background: var(--pri); border-radius: 8px; padding: 3px 10px; white-space:nowrap; }
+  .sec-title { font-size: 16px; font-weight: 800; color:#4B4636; }
+  .sec-desc { font-size: 12.5px; color:#7D7968; }
+  .win { width: 1180px; margin: 0 auto 26px; border-radius: 16px; overflow: hidden; background: var(--scr);
+         border: 1px solid #D6D0BF; box-shadow: 0 10px 34px rgba(60,50,20,.16); }
+  .win-cap { text-align:center; font-size:12px; color:#7D7968; margin: 2px auto 20px; max-width: 1000px; line-height:1.7; }
+  .titlebar { height: 40px; background:#FDFBF7; border-bottom:1px solid var(--bd); display:flex; align-items:center; padding:0 16px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; }
+  .dot.r{background:#FF5F57}.dot.y{background:#FEBC2E}.dot.g{background:#28C840}
+  .ttl { font-size:12px; color:var(--sub); margin-left:8px; }
+  .ic { display:inline-block; vertical-align:middle; }
+  .ic svg { display:block; }
+  .badge { width:32px; height:32px; border-radius:50%; background:var(--tint); color:var(--pri);
+           display:flex; align-items:center; justify-content:center; }
+  .brand { font-size:16px; font-weight:800; color:var(--pri); margin-left:11px; }
+  .spacer { flex:1; }
+  .btn-tint { background:var(--tint); color:var(--pri); border:none; border-radius:12px; font-size:13px; font-weight:700;
+              padding:9px 18px; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  .btn-circle { width:34px; height:34px; border-radius:50%; background:var(--pri); color:#fff; border:none;
+                display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:16px; }
+  .pill { display:inline-flex; align-items:center; gap:4px; border-radius:12px; padding:4px 10px; font-size:11.5px; font-weight:700; }
+  .pill.warm { background:var(--warmBg); color:var(--warmT); }
+  .pill.pri  { background:var(--tint); color:var(--pri); }
+  .tag { display:inline-flex; border-radius:8px; background:#F1EEE6; color:#7D7968; font-size:10.5px; padding:3px 8px; }
+  .hint { font-size:10.5px; color:var(--faint); }
+  .dash-line { border-top: 1px dashed var(--dim); margin: 10px 0; }
+  .bar { height:9px; border-radius:5px; background:var(--dash); overflow:hidden; }
+  .bar > i { display:block; height:100%; border-radius:5px; background:var(--pri); }
+  .todo-row { display:flex; align-items:center; gap:10px; padding:6px 0; font-size:12.5px; }
+  .todo-row .ckb { width:16px; height:16px; border-radius:50%; border:1.5px solid #C9C4B4; flex:none; display:flex; align-items:center; justify-content:center; color:#fff; }
+  .todo-row.done .ckb { background:var(--pri); border-color:var(--pri); }
+  .todo-row.done .tx { color:var(--faint); text-decoration:line-through; }
+  .todo-row .due { margin-left:auto; color:var(--faint); font-size:10.5px; }
+  .prog-h { display:flex; align-items:center; justify-content:space-between; font-size:12.5px; }
+  .prog-h .pct { color:var(--pri); font-weight:800; }
+  .inputbar { display:flex; align-items:center; gap:10px; background:var(--card); border:1.5px solid var(--bd);
+              border-radius:14px; padding:6px 7px 6px 15px; }
+  .inputbar .ph { flex:1; color:var(--faint); font-size:12.5px; }
+  .sidebar { width:264px; background:var(--side); border-right:1px solid var(--bd); display:flex; flex-direction:column; padding:18px 14px; flex:none; }
+  .side-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; color:var(--txt);
+               font-size:13px; cursor:pointer; }
+  .side-item:hover { background:rgba(0,0,0,.04); }
+  .side-item.on { background:var(--tint); color:var(--pri); font-weight:700; }
+  .side-item .del { margin-left:auto; color:var(--dim); font-size:11px; }
+  .sec-label { font-size:11.5px; color:var(--sub); font-weight:700; padding: 0 12px; margin: 12px 0 6px; }
+  .card-title { font-size:13.5px; font-weight:800; display:flex; align-items:center; }
+  .card-title .r { margin-left:auto; display:inline-flex; align-items:center; color:var(--sub); }
+  .grid-date { width:22px; height:22px; line-height:22px; margin:auto; border-radius:50%; background:var(--pri); color:#fff; font-weight:800; }
+  .cdate { padding:4px 0; text-align:center; }
+  .date-banner { display:flex; align-items:center; gap:14px; background:var(--card); border:1px solid var(--bd);
+                 border-radius:16px; padding:16px 20px; }
+  .date-num { font-size:38px; font-weight:800; line-height:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-title">Shiromi · 布局 3 优化版（主次双列 · 均衡）</div>
+  <div class="page-sub">侧栏与布局 3 一致 · 改进点：日期横幅进主栏 + 主列卡片拆双栏（宽度 ~550px → ~290px）· 信息轨保留迷你日历 + 待办预览</div>
+
+  <!-- ═══════════ 3A ═══════════ -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-tag">优化版 A</span>
+      <span class="sec-title">日期横幅 + 主列 2×2 双栏（推荐）</span>
+      <span class="sec-desc">主栏自上而下：日期横幅 → 每日推荐/学习进度 → 搜索/本周概览；右侧信息轨：迷你日历 + 待办预览。</span>
+    </div>
+    <div class="win">
+      <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ttl">Shiromi — 首页</span></div>
+      <div style="display:flex; min-height:660px;">
+        <div class="sidebar" id="sideA">
+  <div style="display:flex; align-items:center; padding:0 4px;">
+    <span class="ic" style="width:20px;height:20px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></span>
+    <span class="brand" style="font-size:16px; margin-left:11px;">Shiromi</span>
+  </div>
+  <div style="height:20px;"></div>
+  <button class="btn-tint" style="justify-content:center; width:100%;"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>新对话</button>
+  <div style="height:8px;"></div>
+  <button class="btn-tint" style="justify-content:center; width:100%; background:var(--warmBg); color:var(--warmT);"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"></path></svg></span>新教练</button>
+  <div class="sec-label">会话历史</div>
+  <div class="side-item on"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>P1234 题解讨论<span class="del">✕</span></div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>动态规划专项训练</div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>数学复习计划</div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>图论最短路答疑</div>
+  <div style="flex:1;"></div>
+  <div class="dash-line"></div>
+  <div class="side-item" style="color:var(--sub);"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7c.9.7 1.5 1.7 1.8 2.8h4.4c.3-1.1.9-2.1 1.8-2.8A7 7 0 0 0 12 2z"></path></svg></span>💡 推荐<span style="margin-left:auto; font-size:11px;">▸</span></div>
+  <div class="side-item" style="color:var(--sub);"><span class="ic" style="width:15px;height:15px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"></path></svg></span>设置</div>
+</div>
+        <div style="flex:1; display:flex; gap:18px; padding:22px;">
+          <!-- 主列 -->
+          <div style="flex:1; display:flex; flex-direction:column; gap:18px;">
+            <!-- 日期横幅 -->
+            <div class="date-banner">
+              <div class="date-num">16</div>
+              <div style="margin-left:2px;">
+                <div style="font-size:13px; color:var(--sub);">八月 · 周六</div>
+                <div style="font-size:10.5px; color:var(--faint);">2026</div>
+              </div>
+              <span class="spacer"></span>
+              <span class="pill warm">🔥 连续 12 天</span>
+              <span class="pill pri">2 个事件</span>
+              <span style="font-size:22px; color:var(--faint);">(´｡• ᵕ •｡`)</span>
+            </div>
+            <!-- 双栏 1 -->
+            <div style="display:flex; gap:18px;">
+              <div class="card" style="flex:1; padding:16px;">
+                <div class="card-title" style="font-size:13px;"><span>每日推荐</span><span class="r ic" id="i-ref1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px;"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></span></div>
+                <div style="margin-top:9px; font-size:13px; font-weight:800; line-height:1.35;">P1234 数列分段<br>Section II</div>
+                <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
+                  <span class="pill warm" style="font-size:10px; padding:2px 8px;">提高+</span>
+                  <span class="tag" style="font-size:10px;">#贪心</span><span class="tag" style="font-size:10px;">#动态规划</span>
+                </div>
+                <div style="margin-top:9px; font-size:11.5px; color:#6F6B5D; line-height:1.6;">结合近期「区间DP」正确率推荐，先想 O(n²) 再优化到 O(n log n)。</div>
+                <div style="text-align:right; margin-top:8px; font-size:12px; color:var(--pri); font-weight:700;">查看详情 ›</div>
+              </div>
+              <div class="card" style="flex:1; padding:16px;">
+                <div class="card-title" style="font-size:13px;"><span>📊 学习进度</span></div>
+                <div style="display:flex; align-items:center; gap:7px; margin-top:10px; font-size:12px;">
+                  <span>🔥</span><span style="color:var(--sub);">连续打卡</span><span style="font-size:16px; font-weight:800; color:var(--warmT);">12</span><span style="color:var(--sub);">天</span>
+                </div>
+                <div style="margin-top:10px;" class="prog-h"><span style="color:var(--sub);">本周：动态规划</span><span class="pct">62%</span></div>
+                <div class="bar" style="margin-top:6px;"><i style="width:62%;"></i></div>
+                <div style="margin-top:7px; font-size:10.5px; color:var(--faint);">12/20 题 · 继续加油！</div>
+              </div>
+            </div>
+            <!-- 双栏 2 -->
+            <div style="display:flex; gap:18px;">
+              <div class="card" style="flex:1; padding:14px 16px;">
+                <div class="inputbar"><span class="ic" style="color:var(--faint)" id="i-sch1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" style="width: 14px; height: 14px;"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg></span><span class="ph" style="font-size:12px;">输入题目编号搜索…</span><button class="btn-circle ic" style="width:28px; height:28px;" id="i-send1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px;"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4z"></path></svg></button></div>
+              </div>
+              <div class="card" style="flex:1; padding:16px;">
+                <div class="card-title" style="font-size:13px;"><span>🗓 本周概览</span></div>
+                <div style="margin-top:10px;" class="prog-h"><span style="color:var(--sub);">待办完成率</span><span class="pct">8 / 12</span></div>
+                <div class="bar" style="margin-top:6px;"><i style="width:67%;"></i></div>
+                <div style="margin-top:7px; font-size:10.5px; color:var(--faint);">距离目标还差 4 项</div>
+              </div>
+            </div>
+          </div>
+          <!-- 信息轨 -->
+          <div style="width:288px; flex:none; display:flex; flex-direction:column; gap:18px;">
+            <div class="card" style="padding:16px;">
+              <div class="card-title" style="font-size:12.5px;"><span>📅 8月</span><span class="r"><span class="pill pri" style="padding:2px 8px; font-size:10px;">今天</span></span></div>
+              <div style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:10px; color:var(--faint); margin:9px 0 3px;">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(7,1fr); row-gap:2px; text-align:center; font-size:11px;">
+                <span class="cdate" style="color:var(--dim);">27</span><span class="cdate" style="color:var(--dim);">28</span><span class="cdate" style="color:var(--dim);">29</span><span class="cdate" style="color:var(--dim);">30</span><span class="cdate" style="color:var(--dim);">31</span><span class="cdate">1</span><span class="cdate">2</span>
+                <span class="cdate">3</span><span class="cdate">4</span><span class="cdate">5</span><span class="cdate">6</span><span class="cdate">7</span><span class="cdate">8</span><span class="cdate">9</span>
+                <span class="cdate">10</span><span class="cdate">11</span><span class="cdate">12</span><span class="cdate">13</span><span class="cdate">14</span><span class="cdate">15</span><span><span class="grid-date">16</span></span>
+                <span class="cdate">17</span><span class="cdate">18</span><span class="cdate">19</span><span class="cdate">20</span><span class="cdate">21</span><span class="cdate">22</span><span class="cdate">23</span>
+                <span class="cdate">24</span><span class="cdate">25</span><span class="cdate">26</span><span class="cdate">27</span><span class="cdate">28</span><span class="cdate">29</span><span class="cdate">30</span>
+                <span class="cdate">31</span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div style="margin-top:7px; display:flex; gap:5px; flex-wrap:wrap;">
+                <span class="pill warm" style="font-size:10px; padding:2px 8px;">3</span>
+                <span class="pill pri" style="font-size:10px; padding:2px 8px;">9</span>
+                <span class="pill pri" style="font-size:10px; padding:2px 8px;">21</span>
+                <span class="pill warm" style="font-size:10px; padding:2px 8px;">28</span>
+                <span class="hint" style="align-self:center;">有事件</span>
+              </div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <div class="card-title" style="font-size:12.5px;"><span>📋 待办</span><span class="r hint">2/3</span></div>
+              <div style="margin-top:6px;">
+                <div class="todo-row" style="font-size:12px;"><span class="ckb ic" id="i-chk1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px;"><path d="M20 6L9 17l-5-5"></path></svg></span><span class="tx">补线段树总结</span></div>
+                <div class="todo-row" style="font-size:12px;"><span class="ckb"></span><span class="tx">注册 CF div2 比赛</span><span class="due">周五</span></div>
+                <div class="todo-row" style="font-size:12px;"><span class="ckb"></span><span class="tx">P1234 写完并提交</span><span class="due">今日</span></div>
+              </div>
+              <div style="margin-top:6px; text-align:right; font-size:12px; color:var(--pri); font-weight:700;">查看全部 ›</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="win-cap">优化版 A：主栏自上而下「日期横幅 → 每日推荐/学习进度 → 搜索/本周概览」，卡片宽度 ~290px；信息轨 = 迷你日历 + 待办预览。主次分明且比例协调</div>
+  </div>
+
+  <!-- ═══════════ 3B ═══════════ -->
+  
+
+  <!-- ═══════════ 聊天页参考 ═══════════ -->
+  
+</div>
+
+<script>
+const I = {
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  cpu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>',
+  msg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.9.7 1.5 1.7 1.8 2.8h4.4c.3-1.1.9-2.1 1.8-2.8A7 7 0 0 0 12 2z"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
+  redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'
+};
+const sidebar = (brandSize) => `
+  <div style="display:flex; align-items:center; padding:0 4px;">
+    <span class="ic" style="width:20px;height:20px;">${I.book}</span>
+    <span class="brand" style="font-size:${brandSize}px; margin-left:11px;">Shiromi</span>
+  </div>
+  <div style="height:20px;"></div>
+  <button class="btn-tint" style="justify-content:center; width:100%;"><span class="ic" style="width:15px;height:15px;">${I.plus}</span>新对话</button>
+  <div style="height:8px;"></div>
+  <button class="btn-tint" style="justify-content:center; width:100%; background:var(--warmBg); color:var(--warmT);"><span class="ic" style="width:15px;height:15px;">${I.cpu}</span>新教练</button>
+  <div class="sec-label">会话历史</div>
+  <div class="side-item on"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>P1234 题解讨论<span class="del">✕</span></div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>动态规划专项训练</div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>数学复习计划</div>
+  <div class="side-item"><span class="ic" style="width:15px;height:15px;">${I.msg}</span>图论最短路答疑</div>
+  <div style="flex:1;"></div>
+  <div class="dash-line"></div>
+  <div class="side-item" style="color:var(--sub);"><span class="ic" style="width:15px;height:15px;">${I.light}</span>💡 推荐<span style="margin-left:auto; font-size:11px;">▸</span></div>
+  <div class="side-item" style="color:var(--sub);"><span class="ic" style="width:15px;height:15px;">${I.gear}</span>设置</div>
+`;
+document.getElementById('sideA').innerHTML = sidebar(16);
+document.getElementById('sideB').innerHTML = sidebar(16);
+document.getElementById('sideC').innerHTML = sidebar(14.5).replace('<div style="height:20px;"></div>','<div style="height:14px;"></div>');
+function inject(id, name, size){ const el=document.getElementById(id); if(!el) return; el.insertAdjacentHTML('afterbegin', I[name]); const s=el.querySelector('svg'); s.style.width=(size||15)+'px'; s.style.height=(size||15)+'px'; el.classList.add('ic'); }
+inject('i-ref1','refresh',13); inject('i-sch1','search',14); inject('i-send1','send',12); inject('i-chk1','check',8);
+inject('i-ref2','refresh',13); inject('i-sch2','search',14); inject('i-send2','send',12); inject('i-chk2','check',8);
+inject('i-moon','moon',17); inject('i-chev','chev',10);
+inject('i-edit','edit',12); inject('i-redo','redo',12); inject('i-copy','copy',12); inject('i-trash','trash',12);
+inject('i-send','send',15);
+['i-edit','i-redo','i-copy','i-trash'].forEach((id,i)=>{
+  const el=document.getElementById(id);
+  el.insertAdjacentHTML('beforeend','<span style="margin-left:5px;">'+['编辑','重试','复制','删除'][i]+'</span>');
+  el.style.cssText='display:inline-flex; align-items:center; gap:5px; background:#F4F1E9; border-radius:13px; padding:5px 11px; font-size:11px; color:#6F6B5D; font-weight:700;';
+});
+</script>
+
+
+</body></html>

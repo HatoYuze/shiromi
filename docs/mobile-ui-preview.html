@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Shiromi 移动端 UI 优化预览（修改后）</title>
+<style>
+  body { margin: 0; background: #e8e5dc; display: flex; justify-content: center; padding: 20px 0; }
+  #app { max-width: 2460px; width: 100%; overflow-x: auto; }
+  #app svg { display: block; margin: 0 auto; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border-radius: 12px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ═══ 基础（沿用原草案；图标不变，保留应用现有 Feather 风格）═══
+const PY = 44, PW = 360, PH = 760, GAP = 26, PAD = 28;
+const W = PAD*2 + PW*6 + GAP*5;
+const H = 850;
+const P = [];
+const C = {
+  page:"#DDD8CB", scr:"#F7F4EC", card:"#FFFFFF", bd:"#E6E0D2",
+  pri:"#4A5599", tint:"#EAEDF8", txt:"#2B2A33", sub:"#8B8778",
+  faint:"#B4AF9E", warm:"#D98F68", warmT:"#B26B43", warmBg:"#F6E8DD",
+  dim:"#CFCABB", dash:"#EFEAE0"
+};
+const FF = "PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif";
+
+const r = (x,y,w,h,rx,fill,stroke,sw,extra) => '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+rx+'" fill="'+(fill||"none")+'"'+(stroke?' stroke="'+stroke+'" stroke-width="'+(sw||1)+'"':'')+(extra||'')+'/>';
+const t = (x,y,s,size,fill,weight,anchor) => '<text x="'+x+'" y="'+y+'" font-size="'+size+'" fill="'+(fill||C.txt)+'"'+(weight?' font-weight="'+weight+'"':'')+(anchor?' text-anchor="'+anchor+'"':'')+'>'+s+'</text>';
+const ln = (x1,y1,x2,y2,stroke,w,dash) => '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+stroke+'" stroke-width="'+(w||1)+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
+const cir = (cx,cy,rr,fill,stroke,sw) => '<circle cx="'+cx+'" cy="'+cy+'" r="'+rr+'" fill="'+(fill||"none")+'"'+(stroke?' stroke="'+stroke+'" stroke-width="'+(sw||1)+'"':'')+'/>';
+
+// ── 图标（Feather 风格，保持不变）──
+const icBook = (x,y,c) => '<path d="M'+(x-6)+' '+(y-7)+' a2 2 0 0 1 2 -2 h3 v14 h-3 a2 2 0 0 1 -2 -2 Z" fill="none" stroke="'+c+'" stroke-width="1.6"/>'+
+  '<path d="M'+(x+6)+' '+(y-7)+' a2 2 0 0 0 -2 -2 h-3 v14 h3 a2 2 0 0 0 2 -2 Z" fill="none" stroke="'+c+'" stroke-width="1.6"/>';
+const icGear = (x,y,c) => { let s = cir(x,y,4.5,"none",c,1.6); for(let i=0;i<8;i++){const a=i*Math.PI/4; s+=ln(x+Math.cos(a)*6.5,y+Math.sin(a)*6.5,x+Math.cos(a)*9,y+Math.sin(a)*9,c,1.6);} return s; };
+const icSearch = (x,y,c) => cir(x,y,4.5,"none",c,1.6)+ln(x+3.2,y+3.2,x+8,y+8,c,1.8);
+const icSend = (x,y,c) => '<path d="M'+(x-5)+' '+(y-6)+' L'+(x+6)+' '+y+' L'+(x-5)+' '+(y+6)+' L'+(x-2)+' '+y+' Z" fill="'+c+'"/>';
+const icPencil = (x,y,c) => '<path d="M'+(x-5)+' '+(y+5)+' L'+(x-6)+' '+(y+6)+' L'+(x-3.5)+' '+(y+6)+' L'+(x+5)+' '+(y-2.5)+' L'+(x+2.5)+' '+(y-5)+' L'+(x-6)+' '+(y+3.5)+' Z" fill="none" stroke="'+c+'" stroke-width="1.3"/>';
+const icRedo = (x,y,c) => '<path d="M'+(x+7)+' '+(y-4)+' A6 6 0 1 0 '+(x+7)+' '+(y+4)+'" fill="none" stroke="'+c+'" stroke-width="1.4"/>'+'<path d="M'+(x+7)+' '+(y-7)+' v6 h-6" fill="none" stroke="'+c+'" stroke-width="1.4"/>';
+const icCopy = (x,y,c) => r(x-5,y-5,8,8,1.5,"none",c,1.3)+r(x-1.5,y-1.5,8,8,1.5,"none",c,1.3);
+const icTrash = (x,y,c) => r(x-4,y-3,8,9,1.5,"none",c,1.3)+ln(x-5.5,y-3,x+5.5,y-3,c,1.3)+ln(x-2,y-3,x-2,y-6.5,c,1.3)+ln(x+2,y-3,x+2,y-6.5,c,1.3)+ln(x-1.5,y-6,x+1.5,y-6,c,1.3);
+const icPlus = (x,y,c) => ln(x-5,y,x+5,y,c,2)+ln(x,y-5,x,y+5,c,2);
+const icRefresh = (x,y,c) => '<path d="M'+(x-2)+' '+(y-7)+' A7 7 0 1 0 '+(x+7)+' '+(y-1)+'" fill="none" stroke="'+c+'" stroke-width="1.5"/>'+'<path d="M'+(x-2)+' '+(y-10)+' v6 h6" fill="none" stroke="'+c+'" stroke-width="1.5"/>';
+const icBack = (x,y,c) => '<path d="M'+(x+4)+' '+(y-7)+' L'+(x-4)+' '+y+' L'+(x+4)+' '+(y+7)+'" fill="none" stroke="'+c+'" stroke-width="2"/>';
+const icDots = (x,y,c) => cir(x-3,y,1.6,c)+cir(x+3,y,1.6,c)+cir(x,y,1.6,c);
+const icHelp = (x,y,c) => cir(x,y,6,"none",c,1.5)+'<path d="M'+(x-2.5)+' '+(y-3)+' a2.5 2.5 0 1 1 4.8 1 c-1.3 1.4 -2.3 2 -2.3 3.6" fill="none" stroke="'+c+'" stroke-width="1.4"/>'+cir(x,y+5,1.1,c);
+const icMoon = (x,y,c) => '<path d="M'+(x+5)+' '+(y-6)+' A8 8 0 1 1 '+(x-5)+' '+(y+6)+' A6.5 6.5 0 0 0 '+(x+5)+' '+(y-6)+' Z" fill="none" stroke="'+c+'" stroke-width="1.5"/>';
+const icCheck = (x,y,c) => '<path d="M'+(x-4)+' '+y+' l3 3 l6 -7" fill="none" stroke="'+c+'" stroke-width="1.8"/>';
+
+// ── 手机基础件 ──
+const frame = (px,cap) => {
+  P.push(r(px-9,PY-9,PW+18,PH+18,34,"#23232a"));
+  P.push(r(px,PY,PW,PH,26,C.scr));
+  P.push(t(px+18,PY+20,"12:30",11,C.txt,"600"));
+  P.push(r(px+PW-52,PY+12,24,12,3,"none","#2B2A33",1));
+  P.push(r(px+PW-50,PY+14,16,8,1.5,C.txt));
+  P.push(t(px+PW-60,PY+20,"84%",9,C.sub,"","end"));
+  P.push(t(px+PW/2,PY+PH+26,cap,13,"#4B4636","700","middle"));
+};
+// 顶栏：图标不变 —— 圆形浅底 + BookOpen 图标 + Shiromi + 齿轮
+const appBar = (px,gear) => {
+  P.push(cir(px+30,PY+49,13,C.tint));
+  P.push(icBook(px+30,PY+49,C.pri));
+  P.push(t(px+52,PY+54,"Shiromi",16,C.txt,"700"));
+  if(gear) P.push(icGear(px+PW-28,PY+49,C.sub));
+};
+// 分段胶囊 Tab（替换 Material TabRow）
+const tabRow = (px,active) => {
+  const tabs=["日历","今日","待办"], cw=332/3;
+  P.push(r(px+14,PY+68,332,42,12,C.card,C.bd));
+  tabs.forEach((name,i)=>{
+    const x=px+14+i*cw;
+    if(name===active) P.push(r(x+2,PY+70,cw-4,38,10,C.tint));
+    P.push(t(x+cw/2,PY+94,name,14,name===active?C.pri:C.sub,name===active?"700":"400","middle"));
+  });
+};
+const bottomNav = (px,active) => {
+  const items=[["home","首页"],["chat","对话"],["gear","设置"]];
+  P.push(r(px,PY+PH-58,PW,58,0,"#FFFFFF"));
+  P.push(ln(px,PY+PH-58,px+PW,PY+PH-58,C.bd));
+  items.forEach((it,i)=>{
+    const cx=px+60+i*120, on=it[1]===active, col=on?C.pri:C.faint;
+    if(it[0]==="home") P.push(icBook(cx,PY+PH-38,col));
+    if(it[0]==="chat") P.push(icHelp(cx,PY+PH-38,col));
+    if(it[0]==="gear") P.push(icGear(cx,PY+PH-38,col));
+    P.push(t(cx,PY+PH-12,it[1],10,col,on?"700":"400","middle"));
+  });
+};
+const chip = (x,y,label,bg,fg,w) => {
+  P.push(r(x,y,w,18,9,bg));
+  P.push(t(x+w/2,y+13,label,10,fg,"600","middle"));
+  return w+8;
+};
+const chevL = (x,y,c) => '<path d="M'+(x+4)+' '+(y-7)+' L'+(x-4)+' '+y+' L'+(x+4)+' '+(y+7)+'" fill="none" stroke="'+c+'" stroke-width="2"/>';
+const chevR = (x,y,c) => '<path d="M'+(x-4)+' '+(y-7)+' L'+(x+4)+' '+y+' L'+(x-4)+' '+(y+7)+'" fill="none" stroke="'+c+'" stroke-width="2"/>';
+
+// ═══ 手机1：Home 日历页（双击任意日期新建/编辑；周一优先；选中实心圆）═══
+{
+  const px = PAD;
+  frame(px,"Home · 日历页");
+  appBar(px,true);
+  tabRow(px,"日历");
+  bottomNav(px,"首页");
+  const cy=PY+124;
+  P.push(r(px+14,cy,332,252,14,C.card,C.bd));
+  P.push(chevL(px+30,cy+27,C.pri));
+  P.push(t(px+173,cy+28,"2026年8月",14,C.txt,"700","middle"));
+  P.push(r(px+256,cy+13,42,20,10,"none","#C9CEE8",1));
+  P.push(t(px+277,cy+27,"今天",11,C.pri,"600","middle"));
+  P.push(chevR(px+322,cy+27,C.pri));
+  const wd=["一","二","三","四","五","六","日"], cw=332/7;
+  wd.forEach((w,i)=>P.push(t(px+14+cw/2+i*cw,cy+52,w,10,C.faint,"","middle")));
+  const dim=[27,28,29,30,31];
+  let cells=[];
+  dim.forEach(d=>cells.push({d,dim:1}));
+  for(let d=1;d<=31;d++)cells.push({d,sel:d===16,dot:[3,9,21,28].includes(d)});
+  cells.forEach((c0,i)=>{
+    const col=i%7, row=Math.floor(i/7);
+    const cx=px+14+cw/2+col*cw, cyy=cy+70+row*34+10;
+    if(c0.sel){P.push(cir(cx,cyy-4,13,C.pri)); P.push(t(cx,cyy,c0.d,12,"#fff","700","middle"));}
+    else P.push(t(cx,cyy,c0.d,12,c0.dim?C.dim:C.txt,"","middle"));
+    if(c0.dot&&!c0.sel)P.push(cir(cx,cyy+9,2,C.warm));
+  });
+  const ey=cy+268;
+  P.push(r(px+14,ey,332,126,14,C.card,C.bd));
+  P.push(t(px+28,ey+24,"8月16日 · 周六",13,C.txt,"700"));
+  P.push(t(px+332,ey+24,"2 个事件",11,C.faint,"","end"));
+  P.push(ln(px+28,ey+38,px+332,ey+38,C.dash,1,"3 3"));
+  P.push(r(px+28,ey+52,9,9,2,C.warm));
+  P.push(t(px+46,ey+60,"周赛补题复盘",12,C.txt));
+  P.push(t(px+332,ey+60,"14:00",11,C.faint,"","end"));
+  P.push(r(px+28,ey+82,9,9,2,C.pri));
+  P.push(t(px+46,ey+90,"数学专题：容斥原理",12,C.txt));
+  P.push(t(px+332,ey+90,"全天",11,C.faint,"","end"));
+  P.push(t(px+28,ey+114,"双击日期新建事件 · 点按选择",10,C.faint));
+}
+
+// ═══ 手机2：Home 今日页（数据均来自现有 ViewModel）═══
+{
+  const px = PAD+PW+GAP;
+  frame(px,"Home · 今日页");
+  appBar(px,true);
+  tabRow(px,"今日");
+  bottomNav(px,"首页");
+  let y=PY+124;
+  P.push(r(px+14,y,332,84,14,C.card,C.bd));
+  P.push(t(px+30,y+48,"16",40,C.txt,"800"));
+  P.push(t(px+84,y+34,"八月 · 周六",13,C.sub));
+  P.push(t(px+84,y+52,"2026",10,C.faint));
+  P.push(t(px+340,y+40,"(ﾉ´▽`)ﾉ",13,C.faint,"","end"));
+  let cx0=px+30;
+  cx0+=chip(cx0,y+58,"🔥 连续 12 天",C.warmBg,C.warmT,72);
+  chip(cx0,y+58,"2 个事件",C.tint,C.pri,58);
+  y+=96;
+  P.push(r(px+14,y,332,136,14,C.card,C.bd));
+  P.push(r(px+26,y+16,14,14,4,C.pri));
+  P.push(t(px+48,y+27,"每日推荐",13,C.txt,"700"));
+  P.push(icRefresh(px+328,y+22,C.sub));
+  P.push(t(px+28,y+50,"P1234 数列分段 Section II",14,C.txt,"700"));
+  let tx=px+28;
+  P.push(r(tx,y+60,44,17,8,C.warmBg));
+  P.push(t(tx+22,y+72,"提高+",10,C.warmT,"700","middle"));
+  tx+=52;
+  ["#贪心","#动态规划","#排序"].forEach(tag=>{const w=tag.length*11+16; P.push(r(tx,y+60,w,17,8,"#F1EEE6")); P.push(t(tx+w/2,y+72,tag,10,"#7D7968","","middle")); tx+=w+8;});
+  P.push(t(px+28,y+96,"结合你近期「区间DP」的正确率，推荐这道分段",11,"#6F6B5D"));
+  P.push(t(px+28,y+112,"最优化题，先想 O(n²) 再尝试优化到 O(n log n)。",11,"#6F6B5D"));
+  P.push(t(px+332,y+128,"查看详情 ›",12,C.pri,"700","end"));
+  y+=148;
+  P.push(r(px+14,y,332,46,23,C.card,C.bd));
+  P.push(icSearch(px+36,y+23,C.faint));
+  P.push(t(px+54,y+28,"搜索题目 / 知识点…",13,C.faint));
+  P.push(cir(px+326,y+23,14,C.pri));
+  P.push(icSend(px+326,y+23,"#fff"));
+  y+=58;
+  P.push(r(px+14,y,332,96,14,C.card,C.bd));
+  P.push(r(px+26,y+16,14,14,4,C.warm));
+  P.push(t(px+48,y+27,"学习进度",13,C.txt,"700"));
+  P.push(t(px+332,y+27,"编辑",11,C.faint,"","end"));
+  P.push(t(px+28,y+50,"本周主题：动态规划",11,C.sub));
+  P.push(t(px+332,y+50,"62%",11,C.pri,"700","end"));
+  P.push(r(px+28,y+58,304,9,4.5,"#EFEAE0"));
+  P.push(r(px+28,y+58,188,9,4.5,C.pri));
+  P.push(t(px+28,y+86,"连续 12 天 · 2 个事件",10,C.faint));
+  P.push(t(px+180,y+124,"继续加油，字符串专题快完成了！",12,C.sub,"","middle"));
+}
+
+// ═══ 手机3：Home 待办页（圆形复选 + 虚线分隔 + 完成率）═══
+{
+  const px = PAD+(PW+GAP)*2;
+  frame(px,"Home · 待办页");
+  appBar(px,true);
+  tabRow(px,"待办");
+  bottomNav(px,"首页");
+  let y=PY+124;
+  P.push(r(px+14,y,332,306,14,C.card,C.bd));
+  P.push(r(px+28,y+16,236,34,10,"#FFFFFF",C.bd));
+  P.push(t(px+42,y+38,"添加新待办…",12,C.faint));
+  P.push(cir(px+304,y+33,17,C.pri));
+  P.push(icPlus(px+304,y+33,"#fff"));
+  const todos=[["1","补线段树总结","已坚持 3 天"],["0","注册 CF div2 比赛","周五 22:35"],["0","P1234 写完并提交","今日"],["0","复习容斥原理例题","明日"],["1","整理错题本 · 图论","已完成"]];
+  todos.forEach((td,i)=>{
+    const ty=y+70+i*46;
+    P.push(cir(px+36.5,ty+8.5,8.5,td[0]==="1"?C.pri:"#FFFFFF",td[0]==="1"?C.pri:"#C9C4B4",1.5));
+    if(td[0]==="1")P.push(icCheck(px+36.5,ty+8.5,"#fff"));
+    P.push(t(px+56,ty+13,td[1],12,td[0]==="1"?C.faint:C.txt,td[0]==="1"?"400":"500"));
+    P.push(t(px+290,ty+13,td[2],10,C.faint,"","end"));
+    P.push(ln(px+306,ty+8,px+314,ty+16,C.dim,1.4));
+    P.push(ln(px+314,ty+8,px+306,ty+16,C.dim,1.4));
+    if(i<4)P.push(ln(px+28,ty+32,px+332,ty+32,C.dash,1,"3 3"));
+  });
+  y+=318;
+  P.push(r(px+14,y,332,92,14,C.card,C.bd));
+  P.push(t(px+28,y+24,"本周概览",13,C.txt,"700"));
+  P.push(t(px+28,y+44,"待办完成率 8 / 12",11,C.sub));
+  P.push(r(px+28,y+52,304,8,4,"#EFEAE0"));
+  P.push(r(px+28,y+52,200,8,4,C.pri));
+  P.push(t(px+180,y+82,"左滑待办可快速删除",10,C.faint,"","middle"));
+}
+
+// ═══ 手机4：对话页（顶栏去主题按钮；带文案操作条；AskUser；圆形发送）═══
+{
+  const px = PAD+(PW+GAP)*3;
+  frame(px,"对话页");
+  P.push(ln(px,PY+34,px+PW,PY+34,C.bd));
+  P.push(icBack(px+26,PY+56,C.pri));
+  P.push(t(px+PW/2,PY+50,"P1234 题解讨论",14,C.txt,"700","middle"));
+  P.push(t(px+PW/2,PY+68,"COACH · 12 条消息",10,C.faint,"","middle"));
+  P.push(icDots(px+PW-26,PY+56,C.pri));
+  P.push(ln(px,PY+80,px+PW,PY+80,C.bd));
+  // 用户气泡（实心 primary + 尾巴）
+  P.push(r(px+128,PY+96,218,40,14,C.pri));
+  P.push('<path d="M'+(px+142)+' '+(PY+136)+' L'+(px+128)+' '+(PY+136)+' L'+(px+142)+' '+(PY+122)+' Z" fill="'+C.pri+'"/>');
+  P.push(t(px+140,PY+120,"这题我只会暴力，怎么优化到 O(n log n)？",11.5,"#fff"));
+  // 思考折叠行
+  P.push(r(px+14,PY+148,332,24,8,"#F4F1E9"));
+  P.push(t(px+24,PY+164,"▸ 思考过程 · 42 token（点击展开）",10.5,C.sub));
+  // 助手消息卡
+  P.push(r(px+14,PY+180,332,124,14,C.card,C.bd));
+  P.push('<path d="M'+(px+28)+' '+(PY+304)+' L'+(px+14)+' '+(PY+304)+' L'+(px+14)+' '+(PY+290)+' Z" fill="'+C.card+'" stroke="'+C.bd+'"/>');
+  P.push(t(px+28,PY+202,"先观察「分段代价」的单调性，可以二分答案；",11.5,C.txt));
+  P.push(t(px+28,PY+220,"再证明决策单调性后用单调队列优化……",11.5,C.txt));
+  P.push(t(px+28,PY+244,"先从暴力转移方程出发：",11.5,C.txt));
+  P.push(t(px+28,PY+262,"f[i] = min(f[j] + w(j+1, i))",11.5,C.pri,"600"));
+  P.push(t(px+28,PY+288,"已发送 · 1.2k token",9,C.faint));
+  // 常显操作条（带文案胶囊）
+  const acts=[[icPencil,"编辑"],[icRedo,"重试"],[icCopy,"复制"],[icTrash,"删除"]];
+  acts.forEach((a,i)=>{const ax=px+14+i*62; P.push(r(ax,PY+312,54,26,13,"#F4F1E9")); a[0](ax+14,PY+325,C.sub); P.push(t(ax+30,PY+329,a[1],9.5,"#6F6B5D","600","middle"));});
+  P.push(t(px+278,PY+330,"常显操作条",9,C.faint));
+  // AskUser 卡（帮助图标不变）
+  let ay=PY+348;
+  P.push(r(px+14,ay,332,158,14,C.card,C.pri,1.5));
+  P.push(icHelp(px+32,ay+22,C.pri));
+  P.push(t(px+48,ay+27,"选择一个方向继续",13,C.txt,"700"));
+  P.push(r(px+256,ay+12,74,18,9,C.warmBg));
+  P.push(t(px+293,ay+24,"⏱ 58s",10,C.warmT,"600","middle"));
+  const opts=[["提示我二分怎么写",0],["直接讲决策单调性",1],["换个思路",0]];
+  opts.forEach((o,i)=>{const oy=ay+42+i*30; if(o[1])P.push(r(px+28,oy,304,26,11,C.tint,C.pri,1.2)); else P.push(r(px+28,oy,304,26,11,"#FFFFFF",C.bd)); P.push(cir(px+42,oy+13,7,o[1]?C.pri:"#FFFFFF",o[1]?C.pri:"#C9C4B4",1.4)); if(o[1])P.push(cir(px+42,oy+13,3,C.pri)); P.push(t(px+58,oy+17,o[0],12,o[1]?C.pri:C.txt,o[1]?"600":"400")); });
+  P.push(r(px+28,ay+134,196,26,13,"#FFFFFF",C.bd));
+  P.push(t(px+42,ay+151,"自定义回答…",11,C.faint));
+  P.push(r(px+236,ay+134,96,26,13,C.pri));
+  P.push(t(px+284,ay+151,"提交",12,"#fff","700","middle"));
+  // TODO 横滚条（✓/○ 图标不变）
+  P.push(t(px+14,PY+522,"TODO（横向滚动）→",9,C.faint));
+  let tcx=px+14;
+  [["动态规划专项",1],["注册比赛",0],["线段树",0],["…",0]].forEach(ch=>{
+    const w=ch[0].length*11+30;
+    P.push(r(tcx,PY+528,w,24,12,ch[1]?C.tint:"#F4F1E9",ch[1]?"#C9CEE8":C.bd));
+    P.push(cir(tcx+12,PY+540,4.5,ch[1]?C.pri:"none",ch[1]?C.pri:"#B4AF9E",1.3));
+    if(ch[1])P.push(icCheck(tcx+12,PY+540,"#fff"));
+    P.push(t(tcx+w/2+5,PY+544,ch[0],10,ch[1]?C.pri:"#7D7968","","middle"));
+    tcx+=w+8;
+  });
+  // 输入栏（圆形发送）
+  P.push(r(px+14,PY+564,264,42,21,"#FFFFFF",C.bd,1.5));
+  P.push(t(px+30,PY+589,"输入消息…",12.5,C.faint));
+  P.push(cir(px+308,PY+585,17,C.pri));
+  P.push(icSend(px+308,PY+585,"#fff"));
+  bottomNav(px,"对话");
+}
+
+// ═══ 手机5：SessionSheet（新对话/新教练/历史会话/深色模式开关）═══
+{
+  const px = PAD+(PW+GAP)*4;
+  frame(px,"SessionSheet");
+  P.push(ln(px,PY+34,px+PW,PY+34,C.bd));
+  P.push(icBack(px+26,PY+56,C.pri));
+  P.push(t(px+PW/2,PY+61,"对话",14,C.txt,"700","middle"));
+  P.push(icDots(px+PW-26,PY+56,C.pri));
+  P.push(r(px+90,PY+92,256,36,14,"#EDE9DF"));
+  P.push(r(px+40,PY+150,240,64,14,"#EDE9DF"));
+  P.push(r(px+130,PY+232,216,36,14,"#EDE9DF"));
+  P.push(r(px+14,PY+560,240,40,20,"#EDE9DF"));
+  bottomNav(px,"对话");
+  // 遮罩
+  P.push(r(px,PY,PW,PH-0,26,"#14120F","","0",' fill-opacity="0.45"'));
+  // 弹层
+  const sy=PY+316;
+  P.push('<path d="M'+px+' '+(sy+30)+' V'+(PY+PH-26)+' a26 26 0 0 0 26 26 H'+(px+PW-26)+' a26 26 0 0 0 26 -26 V'+(sy+30)+' Z" fill="'+C.scr+'"/>');
+  P.push(r(px+PW/2-19,sy+10,38,4,2,"#D5D0C2"));
+  P.push(r(px+20,sy+30,152,40,12,C.pri));
+  P.push(icPlus(px+52,sy+50,"#fff"));
+  P.push(t(px+68,sy+55,"新对话",13,"#fff","700"));
+  P.push(r(px+188,sy+30,152,40,12,C.tint));
+  P.push(icPlus(px+218,sy+50,C.pri));
+  P.push(t(px+234,sy+55,"新教练",13,C.pri,"700"));
+  P.push(t(px+20,sy+96,"历史会话",11,C.sub));
+  const sess=[["P1234 题解讨论","今天 · COACH",1],["动态规划专项训练","昨天 · CHAT",0],["数学复习计划","8/12 · CHAT",0],["图论最短路答疑","8/10 · CHAT",0]];
+  sess.forEach((s,i)=>{const yy=sy+108+i*54; P.push(r(px+20,yy,320,46,11,s[2]?C.tint:"#FFFFFF",s[2]?C.pri:C.bd,s[2]?1.4:1)); P.push(cir(px+38,yy+23,4,s[2]?C.pri:"#C9C4B4")); P.push(t(px+54,yy+22,s[0],12.5,s[2]?C.pri:C.txt,s[2]?"700":"500")); P.push(t(px+54,yy+38,s[1],9.5,C.faint)); if(s[2])P.push(icCheck(px+328,yy+23,C.pri)); P.push(t(px+318,yy+23,"✕",10,C.dim,"","middle")); });
+  // 深色模式（主题切换迁移至此）
+  P.push(ln(px+20,sy+330,px+340,sy+330,C.dash,1,"3 3"));
+  P.push(icMoon(px+34,sy+354,C.sub));
+  P.push(t(px+50,sy+358,"深色模式",12,C.txt,"500"));
+  P.push(r(px+286,sy+344,44,22,11,C.tint));
+  P.push(cir(px+320,sy+355,9,"#FFFFFF","#C9CEE8",1));
+  P.push(t(px+278,sy+358,"关",9,C.sub,"","end"));
+}
+
+// ═══ 手机6：设置页（仅标题；查看日志入内容；底部保存按钮）═══
+{
+  const px = PAD+(PW+GAP)*5;
+  frame(px,"设置页");
+  P.push(ln(px,PY+34,px+PW,PY+34,C.bd));
+  P.push(t(px+20,PY+60,"设置",17,C.txt,"700"));
+  P.push(ln(px,PY+76,px+PW,PY+76,C.bd));
+  let y=PY+92;
+  const sec=(title)=>{P.push(t(px+20,y,title,12,C.pri,"700")); P.push(ln(px+20,y+10,px+340,y+10,C.dash,1,"3 3")); y+=24;};
+  const field=(label,val,ph)=>{P.push(t(px+20,y,label,11,C.sub)); y+=18; P.push(r(px+20,y,320,36,10,"#FFFFFF",C.bd)); P.push(t(px+34,y+24,val,11.5,ph?C.faint:C.txt)); if(ph)y+=48; else y+=48;};
+  const row=(label,val)=>{P.push(r(px+20,y,320,42,10,"#FFFFFF",C.bd)); P.push(t(px+34,y+27,label,12,C.txt,"500")); if(val)P.push(t(px+332,y+27,val,11,C.sub,"","end")); y+=50;};
+  sec("DeepSeek API");
+  field("API Key","sk-••••••••abcd","");
+  row("Model","deepseek-v4-pro");
+  row("Temperature","0.7");
+  y+=6; sec("Luogu API");
+  field("Cookie","••••••••••","");
+  row("UID","123456");
+  y+=6; sec("📦 洛谷缓存");
+  row("缓存条目","1,284");
+  row("缓存大小","36.2 MB");
+  row("清除全部缓存","");
+  y+=6; sec("诊断");
+  P.push(r(px+20,y,320,42,10,"#FFFFFF",C.bd));
+  P.push(t(px+34,y+27,"查看日志",12,C.txt,"500"));
+  P.push(chevR(px+332,y+21,C.faint));
+  y+=50;
+  // 底部保存
+  P.push(r(px+14,PY+668,332,46,23,C.pri));
+  P.push(t(px+180,PY+696,"保存设置",14,"#fff","700","middle"));
+  bottomNav(px,"设置");
+}
+
+const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+
+  '<rect width="'+W+'" height="'+H+'" fill="'+C.page+'"/>'+
+  '<text x="'+(W/2)+'" y="26" font-size="17" fill="#4B4636" font-weight="700" text-anchor="middle" font-family="'+FF+'">Shiromi 移动端 UI 优化预览（修改后）· 图标保持不变 · 浅色主题</text>'+
+  '<g font-family="'+FF+'">'+P.join("")+'</g></svg>';
+
+document.getElementById('app').innerHTML = svg;
+</script>
+</body>
+</html>

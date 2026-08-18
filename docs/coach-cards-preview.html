@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Shiromi · Coach 卡片重渲染样例（init + finished）</title>
+<style>
+  :root {
+    --page:#E8E5DC; --scr:#F7F4EC; --card:#FFFFFF; --bd:#E6E0D2;
+    --pri:#4A5599; --tint:#EAEDF8; --txt:#2B2A33; --sub:#8B8778;
+    --faint:#B4AF9E; --warm:#D98F68; --warmT:#B26B43; --warmBg:#F6E8DD;
+    --dim:#CFCABB; --dash:#EFEAE0; --ok:#3E8E5A; --okBg:#E7F3EC; --err:#B3504A; --errBg:#F8E9E7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--page); font: 14px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; color: var(--txt); padding-bottom: 60px; }
+  .wrap { max-width: 780px; margin: 0 auto; }
+  .page-title { text-align: center; padding: 26px 0 6px; font-size: 21px; font-weight: 800; color:#4B4636; }
+  .page-sub { text-align: center; font-size: 12.5px; color:#7D7968; margin-bottom: 22px; line-height:1.7; }
+  .sec { margin-top: 30px; }
+  .sec-head { display:flex; align-items:baseline; gap:12px; padding: 0 6px; margin-bottom: 12px; }
+  .sec-tag { font-size: 12px; font-weight: 800; color:#fff; background: var(--pri); border-radius: 8px; padding: 3px 10px; white-space:nowrap; }
+  .sec-title { font-size: 16px; font-weight: 800; color:#4B4636; }
+  .sec-desc { font-size: 12.5px; color:#7D7968; }
+  .win { border-radius: 16px; overflow: hidden; background: var(--scr);
+         border: 1px solid #D6D0BF; box-shadow: 0 10px 34px rgba(60,50,20,.16); margin-bottom: 26px; }
+  .titlebar { height: 40px; background:#FDFBF7; border-bottom:1px solid var(--bd); display:flex; align-items:center; padding:0 16px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; }
+  .dot.r{background:#FF5F57}.dot.y{background:#FEBC2E}.dot.g{background:#28C840}
+  .ttl { font-size:12px; color:var(--sub); margin-left:8px; }
+  .chat { padding: 20px 18px; display:flex; flex-direction:column; gap:10px; }
+  .bubble { max-width: 92%; background: var(--card); border:1px solid var(--bd); border-radius:16px;
+            padding: 16px; align-self:flex-start; }
+  .bubble .who { font-size:11px; color:var(--faint); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .bubble .who b { color:var(--pri); font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; overflow:hidden; }
+  .card-h { display:flex; align-items:center; gap:8px; padding:12px 14px; cursor:pointer; }
+  .card-h .t { font-size:14.5px; font-weight:800; color:var(--txt); }
+  .card-h .sub { font-size:11.5px; color:var(--faint); margin-top:2px; }
+  .card-h .grow { flex:1; }
+  .card-h .chev { color:var(--faint); font-size:11px; }
+  .pill { display:inline-flex; align-items:center; gap:4px; border-radius:12px; padding:4px 10px; font-size:11.5px; font-weight:700; }
+  .pill.warm { background:var(--warmBg); color:var(--warmT); }
+  .pill.pri  { background:var(--tint); color:var(--pri); }
+  .tag { display:inline-flex; border-radius:8px; background:#F1EEE6; color:#7D7968; font-size:10.5px; padding:3px 8px; }
+  .divider { border-top:1px solid var(--dash); margin:10px 14px; }
+  /* 题目卡（init） */
+  .stats { display:flex; justify-content:space-around; padding: 8px 14px 10px; }
+  .stat { text-align:center; }
+  .stat .k { font-size:10.5px; color:var(--faint); }
+  .stat .v { font-size:13.5px; font-weight:700; color:var(--txt); }
+  .tags { padding: 0 14px 12px; display:flex; gap:6px; flex-wrap:wrap; }
+  /* 总结卡（finished） */
+  .fin-body { padding: 4px 14px 14px; display:flex; flex-direction:column; gap:12px; }
+  .fin-sec-t { font-size:12px; font-weight:800; color:var(--sub); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .fin-diff { font-size:13px; line-height:1.75; color:var(--txt); background:#F7F4EC; border-radius:10px; padding:10px 12px; }
+  .fin-rec { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .rec-pill { background:var(--tint); color:var(--pri); border-radius:10px; padding:5px 12px; font-size:12px; font-weight:800; cursor:pointer;
+              border:1px solid var(--pri); text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+  .rec-pill:hover { background:var(--pri); color:#fff; }
+  .fin-outro { font-size:13px; line-height:1.8; color:var(--txt); }
+  .fin-outro .em { color:var(--warmT); font-weight:700; }
+  .nav-note { font-size:11.5px; color:var(--faint); background:var(--warmBg); border:1px dashed var(--warm);
+              border-radius:8px; padding:6px 10px; margin-top:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-title">Shiromi · Coach 卡片重渲染样例</div>
+  <div class="page-sub">两种卡片：① init 题目卡（修复解析后正常触发）② finished 总结卡（新增：展示 agent 总结的难点 + 可点击推荐题 + 告别语）<br>
+  内部记忆信息（评分、历史、卡点过程记录）不展示；checkpoint 为内部上下文压缩，未来随协议删除，无卡片。</div>
+
+  <!-- ═══════════ 窗口：模拟消息流 ═══════════ -->
+  <div class="win">
+    <div class="titlebar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="ttl">Shiromi · Coach 会话 — P4513 线段树辅导</span>
+    </div>
+    <div class="chat">
+
+      <!-- ── ① init 题目卡 ── -->
+      <div class="bubble">
+        <div class="who"><b>教练</b> · init 已选题 P4513</div>
+        <div class="card">
+          <div class="card-h">
+            <div class="grow">
+              <div class="t">P4513 区间最大子段和</div>
+              <div class="sub"><span class="pill warm">提高+/省选-</span>&nbsp; · 洛谷</div>
+            </div>
+            <span class="chev">▼</span>
+          </div>
+          <div class="divider"></div>
+          <div class="stats">
+            <div class="stat"><div class="k">提交</div><div class="v">4.2k</div></div>
+            <div class="stat"><div class="k">通过</div><div class="v">1.8k</div></div>
+            <div class="stat"><div class="k">时间限制</div><div class="v">1.00s</div></div>
+            <div class="stat"><div class="k">内存限制</div><div class="v">125MB</div></div>
+          </div>
+          <div class="divider" style="margin-top:0"></div>
+          <div class="tags">
+            <span class="tag">线段树</span><span class="tag">区间合并</span><span class="tag">数据结构</span>
+          </div>
+          <div style="padding:0 14px 14px; font-size:12.5px; color:var(--sub); line-height:1.7;">
+            展开后展示：题目背景 / 题目描述 / 输入格式 / 输出格式 / 输入输出样例（可复制）/ 说明提示，均按 Markdown + LaTeX 渲染。
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ② finished 总结卡 ── -->
+      <div class="bubble">
+        <div class="who"><b>教练</b> · finished 会话总结</div>
+        <div class="card">
+          <div class="card-h">
+            <div class="grow"><div class="t">🎉 本次辅导总结</div></div>
+            <span class="chev">▲</span>
+          </div>
+          <div class="divider"></div>
+          <div class="fin-body">
+            <div>
+              <div class="fin-sec-t">📌 难点总结（agent 面向学生撰写）</div>
+              <div class="fin-diff">
+                今天的主要难点是 pref 与 suf 两个合并公式的边界情况：你一度在「选左子还是左+右」之间犹豫，后来自己推出并验证了对称的合并写法，这一步突破非常关键。
+              </div>
+            </div>
+            <div>
+              <div class="fin-sec-t">🎯 推荐巩固练习</div>
+              <div class="fin-rec">
+                <a class="rec-pill" href="#problem-detail" title="点击打开题目查看页">SP1043 →</a>
+                <a class="rec-pill" href="#problem-detail" title="点击打开题目查看页">P4513 →</a>
+              </div>
+              <div class="nav-note">点击题号 → 全屏打开对应题目查看页；查看页内「返回」→ 回到本对话（会话状态保持不变）。</div>
+            </div>
+            <div class="fin-outro">
+              今天你掌握了线段树最核心的<span class="em">「节点信息合并」</span>思想——pref、suf、max 三个量的合并推导是这道题的灵魂。你从 sum 出发逐层推演，最终独立实现了代码。记得常回来练练，加油！
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 题目查看页（示意：从推荐题点击进入，返回回到对话）── -->
+      <div id="problem-detail" class="bubble" style="max-width:100%;">
+        <div class="who"><b>题目查看页</b> · 覆盖层（点「返回」回到对话）</div>
+        <div class="card">
+          <div class="card-h">
+            <div class="grow">
+              <div class="t">P4513 区间最大子段和</div>
+              <div class="sub">难度 提高+/省选- · 提交 4.2k · 通过 1.8k</div>
+            </div>
+            <a href="#" style="font-size:12px; color:var(--pri); font-weight:700; text-decoration:none;">← 返回</a>
+          </div>
+          <div class="divider"></div>
+          <div style="padding:0 14px 14px; font-size:12.5px; color:var(--sub); line-height:1.8;">
+            题目描述、输入/输出格式、输入输出样例（可复制）、说明提示等完整题面在此渲染（Markdown + LaTeX）。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="page-sub" style="margin-top:4px;">
+    注：静态视觉样例。实现后推荐题 pill 为可点击交互（跳转题目查看页 → 返回回到对话）；finished 卡不渲染 summary（内部记忆记录）。
+  </div>
+</div>
+</body>
+</html>
