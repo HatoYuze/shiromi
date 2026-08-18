@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.domain.model.ChatMessageDomainModel
 import com.github.hatoyuze.luogu.gui.domain.model.SessionType
 import com.github.hatoyuze.luogu.gui.presentation.components.askuser.AskUserCard
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatEvent
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatUiState
 import com.github.hatoyuze.luogu.gui.theme.LocalThemeIsDark
@@ -50,13 +51,15 @@ internal fun MobileChatScreen(
     messages: List<ChatMessageDomainModel>,
     onEvent: (ChatEvent) -> Unit,
     onBack: () -> Unit,
+    onOpenProblem: ((String) -> Unit)? = null,
 ) {
     var showSessionSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val pending = uiState.pendingAskUser
 
     // 根 Column 不再加 navigationBarsPadding：MobileNav 的 Scaffold 已计入
-    // 底部导航栏高度 + 系统栏 inset，避免输入区被双重抬高。
+    // 底部导航栏高度 + 顶部状态栏 inset，避免输入区被双重抬高；IME 可见时
+    // Scaffold 会隐藏底部导航栏，输入框经 imePadding 直接落在键盘顶边。
     Column(modifier = Modifier.fillMaxSize()) {
         // ── 顶栏：返回 / 居中标题+副标题 / ⋮ ──
         Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
@@ -106,6 +109,7 @@ internal fun MobileChatScreen(
                 onEvent = onEvent,
                 alwaysShowActions = true,
                 compact = true,
+                onOpenProblem = onOpenProblem,
             )
         }
 
@@ -132,7 +136,16 @@ internal fun MobileChatScreen(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(if (todo.completed) "✓" else "○", style = MaterialTheme.typography.labelSmall)
+                            if (todo.completed) {
+                                Icon(
+                                    AppIcons.SuccessIcon,
+                                    contentDescription = "已完成",
+                                    modifier = Modifier.size(11.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            } else {
+                                Text("○", style = MaterialTheme.typography.labelSmall)
+                            }
                             Spacer(Modifier.width(4.dp))
                             Text(todo.title.take(20), style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
@@ -195,7 +208,9 @@ internal fun MobileChatScreen(
             }
         }
 
-        // ── 输入区（IME 适配；发送只走按钮）──
+        // ── 输入区（发送只走按钮）──
+        // imePadding 是输入框唯一的 IME 偏移来源（Scaffold 只取顶部状态栏、
+        // IME 可见时隐藏底部导航栏），键盘弹出时输入框恰好落在键盘顶边一次
         ChatInput(
             onSendMessage = { onEvent(ChatEvent.SendMessage(it)) },
             enabled = !uiState.isLoading && (pending == null || pending.answer == null),

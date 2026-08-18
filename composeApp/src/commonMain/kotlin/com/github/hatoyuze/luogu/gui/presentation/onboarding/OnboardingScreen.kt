@@ -11,12 +11,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -49,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -61,9 +66,11 @@ import com.github.hatoyuze.luogu.gui.config.AppConfigStore
 import com.github.hatoyuze.luogu.gui.config.ConfigService
 import com.github.hatoyuze.luogu.gui.data.Logger
 import com.github.hatoyuze.luogu.gui.data.log.LogCategory
+import com.github.hatoyuze.luogu.gui.imeHideThresholdDp
 import com.github.hatoyuze.luogu.gui.platform.ioDispatcher
 import com.github.hatoyuze.luogu.gui.presentation.adaptive.PlatformSizeClass
 import com.github.hatoyuze.luogu.gui.presentation.adaptive.calculatePlatformSizeClass
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.login.LuoguLoginDialog
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronLeft
@@ -118,38 +125,48 @@ fun OnboardingScreen(onDone: () -> Unit) {
         }
     }
 
+    // IME 可见时隐藏底部操作栏 + 分页内容 imePadding（与 MobileNav 同一套策略）：
+    // 底栏会夹在输入框与窗口底边之间，键盘弹出时 imePadding 会把输入框抬得过高；
+    // 隐藏底栏后内容延伸到底部，输入框恰好落在键盘顶边。
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > with(density) { imeHideThresholdDp.toPx() }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            OnboardingBottomBar(
-                pagerState = pagerState,
-                isDesktop = isDesktop,
-                showActions = pagerState.currentPage == PAGE_COUNT - 1,
-                startEnabled = apiKeyValid,
-                onPrev = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                onNext = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                onDotClick = { page -> scope.launch { pagerState.animateScrollToPage(page) } },
-                onStart = {
-                    scope.launch {
-                        if (persist(onlyValid = false)) {
-                            onDone()
-                        } else {
-                            snackbarHostState.showSnackbar("配置保存失败，请重试")
+            if (!imeVisible) {
+                OnboardingBottomBar(
+                    pagerState = pagerState,
+                    isDesktop = isDesktop,
+                    showActions = pagerState.currentPage == PAGE_COUNT - 1,
+                    startEnabled = apiKeyValid,
+                    onPrev = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
+                    onNext = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                    onDotClick = { page -> scope.launch { pagerState.animateScrollToPage(page) } },
+                    onStart = {
+                        scope.launch {
+                            if (persist(onlyValid = false)) {
+                                onDone()
+                            } else {
+                                snackbarHostState.showSnackbar("配置保存失败，请重试")
+                            }
                         }
-                    }
-                },
-                onSkip = {
-                    scope.launch {
-                        persist(onlyValid = true)
-                        onDone()
-                    }
-                },
-            )
+                    },
+                    onSkip = {
+                        scope.launch {
+                            persist(onlyValid = true)
+                            onDone()
+                        }
+                    },
+                )
+            }
         },
+        // 只取顶部状态栏：底部 inset 在操作栏可见时由其自身处理，隐藏时被键盘覆盖
+        contentWindowInsets = WindowInsets.statusBars,
     ) { padding ->
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
         ) { page ->
             Column(
                 Modifier
@@ -534,23 +551,39 @@ private fun OptionCard(
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    if (configured) "✔" else "›",
-                    color = if (configured) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
+                if (configured) {
+                    Icon(
+                        AppIcons.SuccessIcon,
+                        contentDescription = "已配置",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    Text(
+                        "›",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             if (configured) {
-                Text(
-                    "✓ 已配置",
+                Row(
                     modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        AppIcons.SuccessIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(13.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "已配置",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
             extra?.invoke(this)
         }
@@ -579,19 +612,43 @@ private fun ApiKeyPage(
             isError = apiKeyInput.isNotBlank() && !apiKeyValid,
         )
         Spacer(Modifier.height(6.dp))
-        Text(
+        Row(verticalAlignment = Alignment.CenterVertically) {
             when {
-                apiKeyValid -> "✓ API Key 已填写（格式有效，使用时再验证）"
-                apiKeyInput.isNotBlank() -> "✗ 请填入以 sk- 开头的有效 Key"
-                else -> "将用于 Deepseek 推理服务"
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = when {
-                apiKeyValid -> OkColor
-                apiKeyInput.isNotBlank() -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
+                apiKeyValid -> {
+                    Icon(
+                        AppIcons.SuccessIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = OkColor,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "API Key 已填写（格式有效，使用时再验证）",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = OkColor,
+                    )
+                }
+                apiKeyInput.isNotBlank() -> {
+                    Icon(
+                        AppIcons.CloseIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "请填入以 sk- 开头的有效 Key",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                else -> Text(
+                    "将用于 Deepseek 推理服务",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -659,11 +716,20 @@ private fun SummaryRow(ok: Boolean, title: String, desc: String, onGoto: () -> U
                     .background(if (ok) OkColor.copy(alpha = 0.15f) else WarnColor.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    if (ok) "✓" else "!",
-                    color = if (ok) OkColor else WarnColor,
-                    fontWeight = FontWeight.Bold,
-                )
+                if (ok) {
+                    Icon(
+                        AppIcons.SuccessIcon,
+                        contentDescription = "已完成",
+                        modifier = Modifier.size(16.dp),
+                        tint = OkColor,
+                    )
+                } else {
+                    Text(
+                        "!",
+                        color = WarnColor,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -712,7 +778,13 @@ private fun SensitiveInput(
         isError = isError,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
-            TextButton(onClick = { visible = !visible }) { Text(if (visible) "🙈" else "👁") }
+            TextButton(onClick = { visible = !visible }) {
+                Icon(
+                    imageVector = if (visible) AppIcons.EyeClose else AppIcons.EyeOpen,
+                    contentDescription = if (visible) "隐藏" else "显示",
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         },
         shape = RoundedCornerShape(12.dp),
     )

@@ -34,6 +34,7 @@ import com.github.hatoyuze.luogu.gui.presentation.components.home.StreakRow
 import com.github.hatoyuze.luogu.gui.presentation.components.home.TodoInput
 import com.github.hatoyuze.luogu.gui.presentation.components.home.TodoRow
 import com.github.hatoyuze.luogu.gui.presentation.components.home.TopicProgressBar
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatEvent
 import com.github.hatoyuze.luogu.gui.presentation.state.ChatViewModel
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel
@@ -73,7 +74,8 @@ fun MobileHomeScreen(
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
     val scope = rememberCoroutineScope()
 
-    Box(modifier = modifier.fillMaxSize()) {
+    // imePadding：键盘弹出时整体上移，保证搜索/待办输入框不被遮挡
+    Box(modifier = modifier.fillMaxSize().imePadding()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // ── 顶栏：品牌 + 设置 ──
             MobileHomeTopBar(onSettings = onSettings)
@@ -426,7 +428,7 @@ private fun TodayPage(
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoPill("🔥 连续 ${state.streakDays} 天", warm = true)
+                    InfoPill("连续 ${state.streakDays} 天", warm = true, icon = AppIcons.RiseFilling)
                     if (todayEventCount > 0) {
                         InfoPill("$todayEventCount 个事件", warm = false)
                     }
@@ -462,7 +464,7 @@ private fun TodayPage(
         )
 
         // ── 学习进度 ──
-        HomeContentCard(title = "📊 学习进度", modifier = Modifier.fillMaxWidth()) {
+        HomeContentCard(title = "学习进度", icon = AppIcons.ChartBar, modifier = Modifier.fillMaxWidth()) {
             // 解题统计暂无写入链路时（solvedTotal=0）隐藏，避免误导
             if (state.solvedTotal > 0) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

@@ -46,6 +46,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.utils.toFixed
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
@@ -224,7 +225,8 @@ fun SettingsScreen(
 
         if (compact) {
             // ── 移动端：仅标题 + 可滚动正文 + 底部保存按钮（无返回栏）──
-            Column(Modifier.fillMaxSize()) {
+            // imePadding：键盘弹出时整体上移，设置输入框不被遮挡
+            Column(Modifier.fillMaxSize().imePadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp)) {
                     Text("设置", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 }
@@ -582,7 +584,13 @@ private fun SensitiveEditRow(
             placeholder = { Text(placeholder) }, singleLine = true, shape = RoundedCornerShape(12.dp),
             visualTransformation = if (!visible) PasswordVisualTransformation('*') else VisualTransformation.None,
             trailingIcon = {
-                TextButton(onClick = onToggleVisibility) { Text(if (visible) "🙈" else "👁") }
+                TextButton(onClick = onToggleVisibility) {
+                    Icon(
+                        imageVector = if (visible) AppIcons.EyeClose else AppIcons.EyeOpen,
+                        contentDescription = if (visible) "隐藏" else "显示",
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             },
         )
     }
@@ -646,7 +654,16 @@ private fun ExpandablePromptRow(label: String, value: String, onChange: (String)
                     Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("${value.length} chars " + if (expanded) "▲" else "▼", style = MaterialTheme.typography.labelSmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${value.length} chars", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        AppIcons.SortingIcon,
+                        contentDescription = if (expanded) "收起" else "展开",
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         if (expanded) {

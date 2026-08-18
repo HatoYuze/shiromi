@@ -22,6 +22,14 @@ class ChatJobManager(private val maxConcurrent: Int = 5) {
         val completedToolCalls: MutableList<com.github.hatoyuze.luogu.gui.domain.model.ToolCallInfo> = mutableListOf(),
         /** Track AskUser segments created by ToolCall for later update on ToolResult. */
         val pendingAskUserSegments: MutableMap<String, com.github.hatoyuze.luogu.gui.domain.model.MessageSegment.AskUser> = mutableMapOf(),
+        /**
+         * Ordered timeline of message segments for the CURRENT assistant response.
+         *
+         * Owned by the streaming coroutine (main thread, per-session job); `fetchProblemDetail`
+         * shares this same list so its ProblemCard updates can never be overwritten by the
+         * stream's local snapshot. Lifecycle matches [JobState]: replaced on regenerate.
+         */
+        val segments: MutableList<com.github.hatoyuze.luogu.gui.domain.model.MessageSegment> = mutableListOf(),
     )
 
     suspend fun launch(
