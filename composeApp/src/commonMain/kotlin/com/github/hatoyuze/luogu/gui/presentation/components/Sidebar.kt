@@ -44,27 +44,27 @@ internal fun ChatSidebar(
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(34.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             FeatherIcons.BookOpen,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(11.dp))
                 Text(
-                    "LuoguHelper",
+                    "Shiromi",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
 
             // ── New Chat (matching SidebarActionButton pattern) ──
             Surface(
@@ -83,7 +83,7 @@ internal fun ChatSidebar(
                     Icon(FeatherIcons.Plus, contentDescription = null, modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
-                    Text("New Chat", style = MaterialTheme.typography.bodyMedium,
+                    Text("新对话", style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
                 }
             }
@@ -107,7 +107,7 @@ internal fun ChatSidebar(
                     Icon(FeatherIcons.Cpu, contentDescription = null, modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.secondary)
                     Spacer(Modifier.width(12.dp))
-                    Text("New Coach", style = MaterialTheme.typography.bodyMedium,
+                    Text("新教练", style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.secondary)
                 }
             }
@@ -118,7 +118,7 @@ internal fun ChatSidebar(
 
             // ── History label ──
             Text(
-                "History",
+                "会话历史",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
@@ -137,7 +137,7 @@ internal fun ChatSidebar(
                 if (uiState.chatSessions.isEmpty()) {
                     item {
                         Text(
-                            "No sessions yet",
+                            "暂无会话",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.padding(8.dp),
@@ -160,7 +160,7 @@ internal fun ChatSidebar(
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                "Home",
+                "返回首页",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )

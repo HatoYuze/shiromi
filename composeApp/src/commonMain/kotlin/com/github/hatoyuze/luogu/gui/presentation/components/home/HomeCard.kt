@@ -43,13 +43,14 @@ fun HomeCard(
 }
 
 /**
- * 带标题的首页卡片（移动端「学习进度」等区块沿用）：标题 + 内容。
+ * 带标题的首页卡片（移动端「学习进度」等区块沿用）：可选前置图标 + 标题 + 内容。
  * 桌面端改用 [HomeCard] + [HomeSectionHeader] 组合，此组件保留给移动端简洁用法。
  */
 @Composable
 fun HomeContentCard(
     title: String,
     modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -60,11 +61,7 @@ fun HomeContentCard(
         shadowElevation = 0.dp,
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            HomeSectionHeader(title = title, icon = icon)
             Spacer(Modifier.height(16.dp))
             content()
         }

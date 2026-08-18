@@ -23,6 +23,7 @@ import com.github.hatoyuze.luogu.gui.presentation.components.home.HomeCard
 import com.github.hatoyuze.luogu.gui.presentation.components.home.HomeSectionHeader
 import com.github.hatoyuze.luogu.gui.presentation.components.home.TodoInput
 import com.github.hatoyuze.luogu.gui.presentation.components.home.TodoRow
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel
 
 /** 信息轨最多直接展示的待办条数（「查看全部」前）。 */
@@ -46,7 +47,8 @@ internal fun TodoPreviewCard(
 
     HomeCard(modifier = modifier) {
         HomeSectionHeader(
-            title = "📋 待办",
+            title = "待办",
+            icon = AppIcons.Checklist,
             trailing = {
                 Text(
                     "$done/$total 完成",

@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.domain.model.ChatSessionDomainModel
 import com.github.hatoyuze.luogu.gui.domain.model.SessionType
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.BookOpen
 import compose.icons.feathericons.Cpu
@@ -141,16 +143,24 @@ internal fun HomeSidebar(
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Icon(
+                    AppIcons.Lightbulb,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    "💡 推荐",
+                    "推荐",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
                 Spacer(Modifier.weight(1f))
-                Text(
-                    if (showRecommendations) "▾" else "▸",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                Icon(
+                    imageVector = AppIcons.DirectionRight,
+                    contentDescription = if (showRecommendations) "收起推荐" else "展开推荐",
+                    modifier = Modifier.size(11.dp).rotate(if (showRecommendations) 90f else 0f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
             }
 

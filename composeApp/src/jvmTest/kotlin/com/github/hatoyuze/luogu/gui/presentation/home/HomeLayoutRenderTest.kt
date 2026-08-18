@@ -116,19 +116,19 @@ class HomeLayoutRenderTest {
 
         // ── 布局 3A 关键区块（HomeLayout = 主列 + 信息轨；侧栏在 HomeScreen 层）──
         onNodeWithText("八月 · 周一").assertExists()         // 日期横幅（2026-08-17 为周一）
-        onNodeWithText("🔥 连续 12 天").assertExists()      // 打卡胶囊
+        onNodeWithText("连续 12 天").assertExists()      // 打卡胶囊
         onNodeWithText("距 蓝桥杯报名", substring = true).assertExists()  // 临近事件倒计时
         onNodeWithText("每日推荐").assertExists()           // 主列卡 1
         onNodeWithText("P1234 数列分段 Section II").assertExists()
         onNodeWithText("查看详情 ›").assertExists()
-        onNodeWithText("📊 学习进度").assertExists()         // 主列卡 2
+        onNodeWithText("学习进度").assertExists()         // 主列卡 2
         onNodeWithText("连续打卡", substring = true).assertExists()
         onNodeWithText("动态规划").assertExists()           // 学习专题名
-        onNodeWithText("🗓 本周概览").assertExists()         // 主列卡 4
+        onNodeWithText("本周概览").assertExists()         // 主列卡 4
         onNodeWithText("本周待办完成率").assertExists()
-        onNodeWithText("📋 待办").assertExists()            // 信息轨
+        onNodeWithText("待办").assertExists()            // 信息轨
         onNodeWithText("查看全部 ›").assertExists()         // 待办卡（>4 条时展开入口）
-        onNodeWithText("📅 2026年 8月").assertExists()      // 信息轨日历标题
+        onNodeWithText("2026年 8月").assertExists()      // 信息轨日历标题
         onNodeWithText("有事件").assertExists()             // 日历事件图例
 
         // ── 视觉验证：-Pshiromi.screenshot.dir=/path 时导出 PNG ──

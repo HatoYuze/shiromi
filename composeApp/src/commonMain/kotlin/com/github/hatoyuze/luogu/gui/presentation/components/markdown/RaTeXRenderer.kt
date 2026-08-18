@@ -1,20 +1,12 @@
 package com.github.hatoyuze.luogu.gui.presentation.components.markdown
 
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.FirstBaseline
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import io.ratex.DisplayList
-import io.ratex.compose.RaTeX
-import io.ratex.compose.rememberRaTeXDisplayList
 import io.ratex.measure
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
@@ -86,59 +78,5 @@ fun rememberFormulaDimensions(displayList: DisplayList, fontSize: TextUnit): For
     )
 }
 
-/**
- * A RaTeX wrapper that properly reports its [FirstBaseline] alignment line
- * so that formulas in a [Row] with [Modifier.alignByBaseline] share the same
- * baseline as surrounding [Text].
- *
- * @param precomputedDisplayList when provided, the internal `rememberRaTeXDisplayList`
- *   call is skipped and this [DisplayList] is used directly. This eliminates a
- *   redundant native parse when the caller already holds a parsed [DisplayList].
- */
-@Composable
-fun BaselineAlignedRaTeX(
-    latex: String,
-    modifier: Modifier = Modifier,
-    fontSize: TextUnit = 28.sp,
-    displayMode: Boolean = false,
-    color: Color = LocalContentColor.current,
-    precomputedDisplayList: DisplayList? = null,
-) {
-    val resolvedList: DisplayList?
-    if (precomputedDisplayList != null) {
-        resolvedList = precomputedDisplayList
-    } else {
-        val parseResult by rememberRaTeXDisplayList(latex, displayMode, color)
-        resolvedList = parseResult?.getOrNull()
-    }
-
-    val density = LocalDensity.current
-    val fontSizePx = with(density) { fontSize.toPx() }
-
-    val measured = remember(resolvedList, fontSizePx) {
-        resolvedList?.measure(fontSizePx)
-    }
-
-    if (measured != null && resolvedList != null) {
-        val baselinePx = measured.heightPx.toInt()
-
-        Layout(
-            modifier = modifier,
-            content = {
-                RaTeX(
-                    displayList = resolvedList,
-                    fontSize = fontSize,
-                )
-            },
-        ) { measurables, constraints ->
-            val placeable = measurables.first().measure(constraints)
-            layout(
-                width = placeable.width,
-                height = placeable.height,
-                alignmentLines = mapOf(FirstBaseline to baselinePx),
-            ) {
-                placeable.placeRelative(0, 0)
-            }
-        }
-    }
-}
+// 注：RaTeX 0.1.14+ 的 `io.ratex.compose.RaTeX` 已原生上报 FirstBaseline/LastBaseline，
+// 此前用于对齐的 BaselineAlignedRaTeX 包装器已删除，直接使用 RaTeX 即可。

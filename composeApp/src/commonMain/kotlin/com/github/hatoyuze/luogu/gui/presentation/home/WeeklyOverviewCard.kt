@@ -18,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.presentation.components.home.HomeCard
+import com.github.hatoyuze.luogu.gui.presentation.components.home.HomeSectionHeader
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel
 import com.github.hatoyuze.luogu.gui.platform.currentTimeMillis
 
@@ -40,11 +42,7 @@ internal fun WeeklyOverviewCard(
     val progress = if (total > 0) done.toFloat() / total else 0f
 
     HomeCard(modifier = modifier) {
-        Text(
-            "🗓 本周概览",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+        HomeSectionHeader(title = "本周概览", icon = AppIcons.CalendarIcon)
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

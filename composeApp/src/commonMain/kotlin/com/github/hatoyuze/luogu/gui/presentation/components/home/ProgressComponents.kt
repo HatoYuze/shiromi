@@ -1,13 +1,16 @@
 package com.github.hatoyuze.luogu.gui.presentation.components.home
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -27,15 +30,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.domain.model.StudyTopic
 import com.github.hatoyuze.luogu.gui.presentation.components.HomeDesignTokens
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 
 /** 学习专题名输入上限（防止超长文本持久化/渲染膨胀）。 */
 private const val MAX_TOPIC_NAME_LENGTH = 200
 
-/** 连续打卡行：🔥 + 连续打卡 N 天（桌面与移动端共用）。 */
+/** 连续打卡行：图标 + 连续打卡 N 天（桌面与移动端共用）。 */
 @Composable
 fun StreakRow(streakDays: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("🔥", fontSize = 20.sp)
+        Icon(
+            AppIcons.RiseFilling,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.secondary,
+        )
         Spacer(Modifier.width(8.dp))
         Text(
             "连续打卡 ",
@@ -105,9 +114,11 @@ fun TopicProgressBar(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    "🎯",
-                    fontSize = 18.sp,
+                Icon(
+                    AppIcons.NavigationIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(

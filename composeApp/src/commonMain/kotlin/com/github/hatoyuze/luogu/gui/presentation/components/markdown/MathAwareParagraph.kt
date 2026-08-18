@@ -35,6 +35,7 @@ import com.mikepenz.markdown.utils.codeSpanStyle
 import com.mikepenz.markdown.utils.linkTextSpanStyle
 import io.ratex.DisplayList
 import io.ratex.RaTeXEngine
+import io.ratex.compose.RaTeX
 import io.ratex.measure
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
@@ -63,7 +64,7 @@ private data class MathEntry(
  *
  * Each formula is parsed **once** via [RaTeXEngine.parseBlocking] (cached per formula
  * string + color via [remember]). The resulting [DisplayList] is shared between
- * dimension measurement (placeholder sizing) and rendering ([BaselineAlignedRaTeX]),
+ * dimension measurement (placeholder sizing) and rendering (RaTeX),
  * eliminating the redundant second native parse.
  *
  * The placeholder height is set to [FormulaDimensions.ascent] so that
@@ -135,12 +136,9 @@ private fun rememberInlineMathSupport(
                 // Offset by +descent to bring the baseline back to textBaseline.
                 val descentPx = with(LocalDensity.current) { entry.dims.descent.toPx() }
                 val descentDp = with(LocalDensity.current) { descentPx.toDp() }
-                BaselineAlignedRaTeX(
-                    latex = entry.formula,
-                    displayMode = false,
+                RaTeX(
+                    displayList = entry.displayList,
                     fontSize = fontSize,
-                    color = color,
-                    precomputedDisplayList = entry.displayList,
                     modifier = Modifier.offset(y = descentDp),
                 )
             }
@@ -156,7 +154,7 @@ private fun rememberInlineMathSupport(
 
 /**
  * Drop-in replacement for [MarkdownParagraph] that intercepts inline and block
- * LaTeX math nodes, rendering them via [BaselineAlignedRaTeX].
+ * LaTeX math nodes, rendering them via RaTeX.
  *
  * Three rendering paths:
  * 1. **No math** — delegates to the standard [MarkdownParagraph]
@@ -218,24 +216,18 @@ fun MathAwareParagraph(model: MarkdownComponentModel) {
                                 Modifier.fillMaxWidth(),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                BaselineAlignedRaTeX(
-                                    latex = formula,
-                                    displayMode = true,
+                                RaTeX(
+                                    displayList = blockDl,
                                     fontSize = BLOCK_FONT_SIZE,
-                                    color = themeColor,
-                                    precomputedDisplayList = blockDl,
                                 )
                             }
                         } else {
                             Row(
                                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             ) {
-                                BaselineAlignedRaTeX(
-                                    latex = formula,
-                                    displayMode = true,
+                                RaTeX(
+                                    displayList = blockDl,
                                     fontSize = BLOCK_FONT_SIZE,
-                                    color = themeColor,
-                                    precomputedDisplayList = blockDl,
                                 )
                             }
                         }

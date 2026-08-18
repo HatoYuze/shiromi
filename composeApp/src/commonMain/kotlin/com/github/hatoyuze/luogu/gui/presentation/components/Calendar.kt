@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.domain.model.CalendarEvent
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronLeft
 import compose.icons.feathericons.ChevronRight
@@ -251,12 +253,28 @@ fun CalendarPanel(
                     Icon(FeatherIcons.ChevronLeft, contentDescription = "上月")
                 }
 
-                Text(
-                    text = if (compact) "${displayedYear}年 ${displayedMonth}月"
-                    else "📅 ${displayedYear}年 ${displayedMonth}月",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                if (compact) {
+                    Text(
+                        text = "${displayedYear}年 ${displayedMonth}月",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            AppIcons.CalendarIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "${displayedYear}年 ${displayedMonth}月",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!isCurrentMonth || selectedDate != null) {

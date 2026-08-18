@@ -21,6 +21,7 @@ import com.github.hatoyuze.luogu.gui.presentation.components.formatMonthChinese
 import com.github.hatoyuze.luogu.gui.presentation.components.formatWeekdayShortChinese
 import com.github.hatoyuze.luogu.gui.presentation.components.home.HomeCard
 import com.github.hatoyuze.luogu.gui.presentation.components.home.InfoPill
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.state.HomeViewModel
 
 /**
@@ -69,7 +70,7 @@ internal fun DateBannerCard(
                 )
             }
             Spacer(Modifier.weight(1f))
-            InfoPill(text = "🔥 连续 ${state.streakDays} 天", warm = true)
+            InfoPill(text = "连续 ${state.streakDays} 天", warm = true, icon = AppIcons.RiseFilling)
             if (dayEvents > 0) {
                 Spacer(Modifier.width(8.dp))
                 InfoPill(text = "$dayEvents 个事件", warm = false)

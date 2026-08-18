@@ -28,6 +28,7 @@ import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.model.MarkdownTypography
 import io.ratex.RaTeXEngine
+import io.ratex.compose.RaTeX
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes
@@ -257,9 +258,9 @@ private fun CuteTableCellContent(
                             try { RaTeXEngine.parseBlocking(seg.formula, seg.displayMode, color = color) }
                             catch (_: Exception) { null }
                         }
-                        BaselineAlignedRaTeX(
-                            latex = seg.formula, displayMode = seg.displayMode,
-                            fontSize = CELL_FONT_SIZE, color = color, precomputedDisplayList = dl,
+                        RaTeX(
+                            displayList = dl,
+                            fontSize = CELL_FONT_SIZE,
                         )
                     }
                 }

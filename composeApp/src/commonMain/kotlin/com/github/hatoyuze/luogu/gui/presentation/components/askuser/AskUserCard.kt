@@ -53,6 +53,7 @@ import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.Clock
 import compose.icons.feathericons.HelpCircle
 import kotlinx.coroutines.delay
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.utils.toPad2
 
 /**
@@ -247,7 +248,12 @@ fun AskUserCard(
                                         ) {
                                             if (isSelected) {
                                                 if (isMulti) {
-                                                    Text("✓", fontSize = 10.sp, color = colorScheme.onPrimary)
+                                                    Icon(
+                                                        AppIcons.SuccessIcon,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(10.dp),
+                                                        tint = colorScheme.onPrimary,
+                                                    )
                                                 } else {
                                                     Box(Modifier.size(5.dp).background(colorScheme.onPrimary, CircleShape))
                                                 }
