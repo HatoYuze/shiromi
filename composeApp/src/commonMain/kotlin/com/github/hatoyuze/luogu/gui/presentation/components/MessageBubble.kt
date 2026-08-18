@@ -58,6 +58,9 @@ import com.github.hatoyuze.luogu.gui.presentation.components.markdown.CachingIma
 import com.github.hatoyuze.luogu.gui.presentation.components.markdown.MathAwareParagraph
 import com.github.hatoyuze.luogu.gui.presentation.components.markdown.CuteTableAwareTable
 import com.github.hatoyuze.luogu.gui.presentation.components.markdown.traverseUnhandledNode
+import com.github.hatoyuze.luogu.gui.presentation.components.coach.CoachFinishedCard
+import com.github.hatoyuze.luogu.gui.presentation.components.coach.ProblemCardComposable
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.markdown.FoldableFlavourDescriptor
 import com.github.hatoyuze.luogu.gui.presentation.rememberMarkdownTypography
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
@@ -94,6 +97,7 @@ fun MessageBubble(
     onSendEdit: ((String, String) -> Unit)? = null,
     onCancelEdit: (() -> Unit)? = null,
     compact: Boolean = false,
+    onOpenProblem: ((String) -> Unit)? = null,
 ) {
     val isEditing = editingMessageId == message.id && message.isUser
     val displayContent = message.content
@@ -173,6 +177,8 @@ fun MessageBubble(
                             thinkingElapsedSec = message.thinkingElapsedSec,
                             mdColors = mdColors,
                             typography = typography,
+                            onOpenProblem = onOpenProblem,
+                            compact = compact,
                         )
                     } else {
                         // Legacy or user message: render content directly
@@ -271,10 +277,11 @@ fun MessageBubble(
                                     .padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    text = "✕",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error,
+                                Icon(
+                                    AppIcons.CloseIcon,
+                                    contentDescription = "发送失败",
+                                    modifier = Modifier.size(11.dp),
+                                    tint = MaterialTheme.colorScheme.error,
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
@@ -291,10 +298,11 @@ fun MessageBubble(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    text = "✓",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                                Icon(
+                                    AppIcons.SuccessIcon,
+                                    contentDescription = "已发送",
+                                    modifier = Modifier.size(11.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
                                 )
                                 if (message.totalTokens != null) {
                                     Spacer(Modifier.width(4.dp))
@@ -308,27 +316,15 @@ fun MessageBubble(
                                 when (message.finishReason) {
                                     "length" -> {
                                         Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "⚠ 截断",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                        )
+                                        WarningBadge("截断")
                                     }
                                     "content_filter" -> {
                                         Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "⚠ 过滤",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                        )
+                                        WarningBadge("过滤")
                                     }
                                     "insufficient_system_resource" -> {
                                         Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "⚠ 资源不足",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                        )
+                                        WarningBadge("资源不足")
                                     }
                                 }
                             }
@@ -353,10 +349,13 @@ private fun SegmentedBody(
     thinkingElapsedSec: Int? = null,
     mdColors: com.mikepenz.markdown.model.MarkdownColors,
     typography: com.mikepenz.markdown.model.MarkdownTypography,
+    onOpenProblem: ((String) -> Unit)? = null,
+    compact: Boolean = false,
 ) {
-    // Split into thinking/tool timeline items, problem cards, and content text
+    // Split into thinking/tool timeline items, cards (problem / coach finished), and content text
     val timelineItems = mutableListOf<MessageSegment>()
     val problemCards = mutableListOf<MessageSegment.ProblemCard>()
+    val coachFinishedCards = mutableListOf<MessageSegment.CoachFinished>()
     val contentBuf = StringBuilder()
 
     for (seg in segments) {
@@ -374,6 +373,9 @@ private fun SegmentedBody(
             }
             is MessageSegment.ProblemCard -> {
                 problemCards.add(seg)
+            }
+            is MessageSegment.CoachFinished -> {
+                coachFinishedCards.add(seg)
             }
             is MessageSegment.AskUser -> { /* rendered as AskUserCard in ChatScreen */ }
         }
@@ -396,10 +398,16 @@ private fun SegmentedBody(
         ProblemCardComposable(card)
     }
 
+    // Render coach finished summary cards (difficulty summary + recommend pills + farewell)
+    coachFinishedCards.forEach { card ->
+        Spacer(Modifier.height(6.dp))
+        CoachFinishedCard(card = card, onOpenProblem = onOpenProblem, compact = compact)
+    }
+
     // Render content as markdown
     val text = contentBuf.toString()
     if (text.isNotBlank()) {
-        if (problemCards.isNotEmpty()) Spacer(Modifier.height(8.dp))
+        if (problemCards.isNotEmpty() || coachFinishedCards.isNotEmpty()) Spacer(Modifier.height(8.dp))
         SelectionContainer {
             Markdown(
                 content = text,
@@ -559,6 +567,7 @@ private fun TimelineRow(
                     )
                 }
                 is MessageSegment.ProblemCard -> { /* rendered outside timeline */ }
+                is MessageSegment.CoachFinished -> { /* rendered outside timeline */ }
                 is MessageSegment.AskUser -> { /* rendered as AskUserCard in ChatScreen */ }
             }
         }
@@ -586,6 +595,7 @@ private fun TimelineRow(
                 )
             }
             is MessageSegment.ProblemCard -> { /* rendered outside timeline */ }
+            is MessageSegment.CoachFinished -> { /* rendered outside timeline */ }
             is MessageSegment.AskUser -> { /* rendered as AskUserCard in ChatScreen */ }
         }
     }
@@ -628,4 +638,22 @@ private fun iconForTool(functionName: String) = when {
     "practice" in functionName -> FeatherIcons.CheckCircle
     "filters" in functionName -> FeatherIcons.Filter
     else -> FeatherIcons.Code
+}
+/** 消息状态警示徽标：警示图标 + 文案（截断/过滤/资源不足的图标化）。 */
+@Composable
+private fun WarningBadge(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            AppIcons.WarningIcon,
+            contentDescription = null,
+            modifier = Modifier.size(11.dp),
+            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+        )
+        Spacer(Modifier.width(2.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+        )
+    }
 }

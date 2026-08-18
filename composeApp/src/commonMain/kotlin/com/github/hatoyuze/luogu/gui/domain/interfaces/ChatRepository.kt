@@ -18,6 +18,9 @@ interface ChatRepository {
     suspend fun deleteMessage(messageId: String)
     suspend fun deleteMessages(sessionId: String)
 
+    /** Reads a single message by id; null when it does not exist (e.g. after deletion). */
+    suspend fun getMessage(messageId: String): ChatMessageDomainModel?
+
     // Fork / branch queries
     suspend fun getMessagesByBranch(sessionId: String, branchId: String): List<ChatMessageDomainModel>
     suspend fun insertBranch(branch: ChatBranchDomainModel)

@@ -1,4 +1,4 @@
-package com.github.hatoyuze.luogu.gui.presentation.components
+package com.github.hatoyuze.luogu.gui.presentation.components.coach
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import com.github.hatoyuze.luogu.gui.domain.model.MessageSegment
 import com.github.hatoyuze.luogu.gui.presentation.components.markdown.CachingImageTransformer
 import com.github.hatoyuze.luogu.gui.presentation.components.markdown.MathAwareParagraph
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.luogu.gui.presentation.markdown.FoldableFlavourDescriptor
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Copy
@@ -141,9 +142,11 @@ private fun ProblemCardError(pid: String, error: String, modifier: Modifier = Mo
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "⚠️",
-                fontSize = 16.sp,
+            Icon(
+                AppIcons.WarningIcon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.error,
             )
             Spacer(Modifier.width(8.dp))
             Text(
@@ -229,10 +232,11 @@ private fun ProblemCardContent(
                     }
                 }
                 // Expand/collapse indicator
-                Text(
-                    text = if (expanded) "▲" else "▼",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Icon(
+                    AppIcons.SortingIcon,
+                    contentDescription = if (expanded) "收起" else "展开",
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 

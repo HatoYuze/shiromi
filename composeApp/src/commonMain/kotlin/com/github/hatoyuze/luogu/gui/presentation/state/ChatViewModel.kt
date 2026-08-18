@@ -153,8 +153,10 @@ class ChatViewModel(
             _state.update { it.copy(messages = msgs, isLoading = true) }
 
             jobManager.launch(session.id, viewModelScope) { jobState ->
-                // Declared outside try so catch block can persist partial data
-                val segments = mutableListOf<MessageSegment>()
+                // Declared outside try so catch block can persist partial data.
+                // Shared with fetchProblemDetail via jobState (same list instance), so the
+                // fetch's ProblemCard update can never be overwritten by this stream.
+                val segments = jobState.segments
                 var thinkingStartMs = 0L
                 try {
                     val chatSession = chatService.createSession(session.id, sessionType)
@@ -406,7 +408,7 @@ class ChatViewModel(
                                         else msg
                                     })
                                 }
-                                fetchProblemDetail(pid, assistantId, assistantMsg)
+                                fetchProblemDetail(pid, assistantId, jobState)
                             }
                             is ChatService.StreamEvent.CoachFinished -> {
                                 if (event.recommend != null) {
@@ -414,17 +416,33 @@ class ChatViewModel(
                                         repository.insertRecommendation(session.id, pid)
                                     }
                                 }
+                                segments.add(MessageSegment.CoachFinished(
+                                    summary = event.summary,
+                                    recommend = event.recommend ?: emptyList(),
+                                    content = event.content,
+                                    difficultySummary = event.difficultySummary,
+                                ))
+                                // Dual-write to message.content: the UI renders the card via
+                                // segments, but toProtocolMessage()/branch replay rebuilds the
+                                // DeepSeek history from `content` — keep it complete for
+                                // regenerate / branch switch / edit forks.
                                 jobState.contentBuilder.append("\n\n---\n${event.content}")
                                 _state.update {
                                     it.copy(messages = it.messages.map { msg ->
                                         if (msg.id == assistantId)
-                                            msg.copy(content = jobState.contentBuilder.toString())
+                                            msg.copy(
+                                                content = jobState.contentBuilder.toString(),
+                                                segments = segments.toList(),
+                                            )
                                         else msg
                                     })
                                 }
                             }
                             is ChatService.StreamEvent.CoachCheckpoint -> {
-                                // Content already emitted via Thinking/Content; mark checkpoint in message
+                                // interim: checkpoint is internal context compression; will be removed
+                                // together with the protocol in a future update. No card UI — the
+                                // marker goes into message.content only, so branch replay keeps a
+                                // stable assistant turn (segments render path ignores it).
                                 jobState.contentBuilder.append("\n\n📋 检查点")
                                 _state.update {
                                     it.copy(messages = it.messages.map { msg ->
@@ -794,7 +812,9 @@ class ChatViewModel(
         chatContent: String = assistantMsg.content,
     ) {
         val assistantId = assistantMsg.id
-        val segments = mutableListOf<MessageSegment>()
+        // Shared with fetchProblemDetail via jobState (same list instance), so the
+        // fetch's ProblemCard update can never be overwritten by this stream.
+        val segments = jobState.segments
         var thinkingStartMs = 0L
         try {
             val flow = if (useContinueChat) chatSession.continueChat()
@@ -914,14 +934,25 @@ class ChatViewModel(
                     is ChatService.StreamEvent.CoachInit -> {
                         segments.add(MessageSegment.ProblemCard(pid = event.pid, coachContent = event.content))
                         _state.update { it.copy(messages = it.messages.map { msg -> if (msg.id == assistantId) msg.copy(segments = segments.toList()) else msg }) }
-                        fetchProblemDetail(event.pid, assistantId, assistantMsg)
+                        fetchProblemDetail(event.pid, assistantId, jobState)
                     }
                     is ChatService.StreamEvent.CoachFinished -> {
                         if (event.recommend != null) { for (pid in event.recommend) { repository.insertRecommendation(session.id, pid) } }
+                        segments.add(MessageSegment.CoachFinished(
+                            summary = event.summary,
+                            recommend = event.recommend ?: emptyList(),
+                            content = event.content,
+                            difficultySummary = event.difficultySummary,
+                        ))
+                        // Dual-write to message.content (see first path) for branch replay.
                         jobState.contentBuilder.append("\n\n---\n${event.content}")
-                        _state.update { it.copy(messages = it.messages.map { msg -> if (msg.id == assistantId) msg.copy(content = jobState.contentBuilder.toString()) else msg }) }
+                        _state.update { it.copy(messages = it.messages.map { msg -> if (msg.id == assistantId) msg.copy(content = jobState.contentBuilder.toString(), segments = segments.toList()) else msg }) }
                     }
                     is ChatService.StreamEvent.CoachCheckpoint -> {
+                        // interim: checkpoint is internal context compression; will be removed
+                        // together with the protocol in a future update. No card UI — the
+                        // marker goes into message.content only, so branch replay keeps a
+                        // stable assistant turn (segments render path ignores it).
                         jobState.contentBuilder.append("\n\n📋 检查点")
                         _state.update { it.copy(messages = it.messages.map { msg -> if (msg.id == assistantId) msg.copy(content = jobState.contentBuilder.toString()) else msg }) }
                     }
@@ -1054,11 +1085,16 @@ class ChatViewModel(
     /**
      * Fetches problem detail from Luogu API and updates the [MessageSegment.ProblemCard]
      * segment in the assistant message. Launched on [CoachInit].
+     *
+     * The card is replaced IN PLACE on [ChatJobManager.JobState.segments] — the SAME list
+     * instance the streaming coroutine appends to. Both run on the main thread, so a slow
+     * network response can never be overwritten by later stream events (and vice versa):
+     * the stream and this fetch share one source of truth instead of racing on state.
      */
     private fun fetchProblemDetail(
         pid: String,
         assistantId: String,
-        assistantMsg: ChatMessageDomainModel,
+        jobState: com.github.hatoyuze.luogu.gui.presentation.utils.ChatJobManager.JobState,
     ) {
         viewModelScope.launch {
             // Guard: verify message still exists (user might have switched sessions)
@@ -1068,31 +1104,35 @@ class ChatViewModel(
                 chatService.getProblemDetail(pid)
             } catch (_: Exception) { null }
 
-            // Read current segments from state to avoid stale reference
-            val currentSegments = _state.value.messages
-                .find { it.id == assistantId }?.segments?.toMutableList() ?: return@launch
-            val idx = currentSegments.indexOfFirst {
-                it is MessageSegment.ProblemCard && it.pid == pid && it.loading
-            }
-            if (idx < 0) return@launch
-
             val updated = if (data != null) {
                 MessageSegment.ProblemCard(pid = pid, loading = false, data = data)
             } else {
                 MessageSegment.ProblemCard(pid = pid, loading = false, error = "获取题目详情失败")
             }
-            currentSegments[idx] = updated
 
-            repository.updateMessage(assistantMsg.copy(
-                segments = currentSegments.toList(),
-                status = MessageStatus.SENDING,
-            ))
-            _state.update {
-                it.copy(messages = it.messages.map { msg ->
-                    if (msg.id == assistantId) msg.copy(segments = currentSegments.toList())
-                    else msg
-                })
+            // In-place replacement on the shared list — never a wholesale state write.
+            if (!replaceLoadingProblemCard(jobState.segments, pid, updated)) return@launch
+
+            val latestSegments = jobState.segments.toList()
+            _state.update { state ->
+                if (state.messages.none { it.id == assistantId }) {
+                    state
+                } else {
+                    state.copy(messages = state.messages.map { msg ->
+                        if (msg.id == assistantId) msg.copy(segments = latestSegments)
+                        else msg
+                    })
+                }
             }
+
+            // Re-persist the freshest segments WITHOUT clobbering the stream's final state:
+            // the stream's Done may have stored a still-loading card when the fetch returned
+            // afterwards, so write the current row (state first, DB fallback for the
+            // session-switched window) with only `segments` replaced. updateMessage is a pure
+            // UPDATE — a deleted row is a no-op, so this can never resurrect a message.
+            val current = _state.value.messages.find { it.id == assistantId }
+                ?: repository.getMessage(assistantId)
+            current?.let { repository.updateMessage(it.copy(segments = latestSegments)) }
         }
     }
 
@@ -1104,4 +1144,25 @@ class ChatViewModel(
 
     private fun generateId() = "${currentTime()}-${kotlin.random.Random.nextInt(10000, 99999)}"
     private fun currentTime() = currentTimeMillis()
+}
+
+/**
+ * Replaces the first still-loading [MessageSegment.ProblemCard] with the given [pid]
+ * in [segments], in place.
+ *
+ * Pure and synchronous so the card fetch path can be unit-tested without a ViewModel.
+ *
+ * @return true when a matching loading card was replaced, false otherwise.
+ */
+internal fun replaceLoadingProblemCard(
+    segments: MutableList<MessageSegment>,
+    pid: String,
+    updated: MessageSegment.ProblemCard,
+): Boolean {
+    val idx = segments.indexOfFirst {
+        it is MessageSegment.ProblemCard && it.pid == pid && it.loading
+    }
+    if (idx < 0) return false
+    segments[idx] = updated
+    return true
 }

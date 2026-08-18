@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -65,6 +66,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -80,9 +82,11 @@ import com.github.hatoyuze.luogu.gui.presentation.components.askuser.AskUserCard
 
 
 
+import com.github.hatoyuze.luogu.gui.presentation.components.ProblemDetailPage
 import com.github.hatoyuze.luogu.gui.presentation.components.PulsatingDot
 import com.github.hatoyuze.luogu.gui.presentation.components.RightSideSheet
 import com.github.hatoyuze.luogu.gui.presentation.components.ThinkingIndicator
+import com.github.hatoyuze.luogu.gui.presentation.components.icons.AppIcons
 
 import com.github.hatoyuze.luogu.gui.presentation.modifier.animatedBorder
 
@@ -107,35 +111,51 @@ fun ChatScreen(
     onBack: () -> Unit = {},
 ) {
     val uiState by viewModel.state.collectAsState()
+    // Problem detail overlay: opened from coach finished-card recommend pills;
+    // back returns to the conversation.
+    var problemDetailPid by remember { mutableStateOf<String?>(null) }
 
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        BoxWithConstraints {
-            if (maxWidth < 600.dp) {
-                MobileChatScreen(
-                    uiState = uiState,
-                    messages = uiState.messages,
-                    onEvent = viewModel::handleEvent,
-                    onBack = onBack,
-                )
-            } else {
-                Row(modifier = Modifier.fillMaxSize()) {
-
-                    ChatSidebar(
-                        uiState = uiState,
-                        onEvent = viewModel::handleEvent,
-                        modifier = Modifier.width(260.dp)
-                    )
-
-                    MainContent(
+        Box {
+            BoxWithConstraints {
+                if (maxWidth < 600.dp) {
+                    MobileChatScreen(
                         uiState = uiState,
                         messages = uiState.messages,
                         onEvent = viewModel::handleEvent,
-                        modifier = Modifier.weight(1f)
+                        onBack = onBack,
+                        onOpenProblem = { problemDetailPid = it },
                     )
+                } else {
+                    Row(modifier = Modifier.fillMaxSize()) {
+
+                        ChatSidebar(
+                            uiState = uiState,
+                            onEvent = viewModel::handleEvent,
+                            modifier = Modifier.width(264.dp)
+                        )
+
+                        MainContent(
+                            uiState = uiState,
+                            messages = uiState.messages,
+                            onEvent = viewModel::handleEvent,
+                            onOpenProblem = { problemDetailPid = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
+            }
+
+            // ── Problem detail overlay (full screen; back returns to the chat) ──
+            problemDetailPid?.let { pid ->
+                ProblemDetailPage(
+                    pid = pid,
+                    onBack = { problemDetailPid = null },
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
@@ -147,7 +167,8 @@ private fun MainContent(
     uiState: ChatUiState,
     messages: List<ChatMessageDomainModel>,
     onEvent: (ChatEvent) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenProblem: ((String) -> Unit)? = null,
 ) {
     val state = rememberLazyListState()
 
@@ -156,6 +177,7 @@ private fun MainContent(
     }
     Column(modifier = modifier.fillMaxSize()) {
 
+        // ── 顶栏：会话标题 + 类型/消息数 + 主题切换（对齐移动端对话页头）──
         Surface(
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
@@ -164,21 +186,37 @@ private fun MainContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Column {
+                    Text(
+                        text = uiState.currentSession?.title ?: "对话",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    val typeLabel = if (uiState.currentSession?.type == com.github.hatoyuze.luogu.gui.domain.model.SessionType.COACH)
+                        "COACH" else "CHAT"
+                    Text(
+                        text = "$typeLabel · ${messages.size} 条消息",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 var isDark by LocalThemeIsDark.current
                 IconButton(onClick = { isDark = !isDark }) {
                     Icon(
                         if (isDark) FeatherIcons.Sun else FeatherIcons.Moon,
-                        contentDescription = "Toggle theme"
+                        contentDescription = "切换主题"
                     )
                 }
             }
         }
-
 
         Surface(
             modifier = Modifier
@@ -189,15 +227,20 @@ private fun MainContent(
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
         ) {
-            ChatMessages(
-                state = state,
-                messages = messages,
-                isLoading = uiState.isLoading,
-                editingMessageId = uiState.editingMessageId,
-                activeBranchId = uiState.activeBranchId,
-                branches = uiState.branches,
-                onEvent = onEvent,
-            )
+            // 消息列居中，最大宽度 880dp（对齐样板：居中消息列）
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                ChatMessages(
+                    state = state,
+                    messages = messages,
+                    isLoading = uiState.isLoading,
+                    editingMessageId = uiState.editingMessageId,
+                    activeBranchId = uiState.activeBranchId,
+                    branches = uiState.branches,
+                    onEvent = onEvent,
+                    onOpenProblem = onOpenProblem,
+                    modifier = Modifier.fillMaxSize().widthIn(max = 880.dp),
+                )
+            }
         }
 
         // TODO compact bar
@@ -212,7 +255,16 @@ private fun MainContent(
                     uiState.todos.forEach { todo ->
                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surface) {
                             Row(Modifier.padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(if (todo.completed) "✓" else "○", style = MaterialTheme.typography.labelSmall)
+                                if (todo.completed) {
+                                    Icon(
+                                        AppIcons.SuccessIcon,
+                                        contentDescription = "已完成",
+                                        modifier = Modifier.size(11.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                } else {
+                                    Text("○", style = MaterialTheme.typography.labelSmall)
+                                }
                                 Spacer(Modifier.width(4.dp))
                                 Text(todo.title.take(20), style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
@@ -303,6 +355,8 @@ internal fun ChatMessages(
     onEvent: (ChatEvent) -> Unit,
     alwaysShowActions: Boolean = false,
     compact: Boolean = false,
+    onOpenProblem: ((String) -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     // 新消息到达 → 动画滚动到底
     LaunchedEffect(messages.size) {
@@ -321,7 +375,7 @@ internal fun ChatMessages(
 
     LazyColumn(
         state = state,
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -329,6 +383,7 @@ internal fun ChatMessages(
             val hasContent = message.content.isNotEmpty()
                 || !message.thinkingContent.isNullOrBlank()
                 || !message.toolCalls.isNullOrEmpty()
+                || !message.segments.isNullOrEmpty()
             if (hasContent) {
                 // Check if this is the latest assistant message (for regenerate constraint)
                 val isLatestAssistant = !message.isUser
@@ -370,6 +425,7 @@ internal fun ChatMessages(
                         onSendEdit = { id, content -> onEvent(ChatEvent.SendEdit(id, content)) },
                         onCancelEdit = { onEvent(ChatEvent.CancelEdit) },
                         compact = compact,
+                        onOpenProblem = onOpenProblem,
                     )
                     MessageActionBar(
                         message = message,

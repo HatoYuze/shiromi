@@ -103,6 +103,7 @@ class StreamEventMapper {
             summary = response.response.summary,
             recommend = response.response.recommend,
             content = response.response.content,
+            difficultySummary = response.response.difficultySummary,
         )
         is CoachResponse.Checkpoint -> ChatService.StreamEvent.CoachCheckpoint(segment.rawJson)
     }

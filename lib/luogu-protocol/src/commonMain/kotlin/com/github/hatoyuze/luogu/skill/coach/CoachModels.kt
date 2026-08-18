@@ -60,6 +60,9 @@ data class CoachProcessingResponse(
 data class CoachFinishedResponse(
     @SerialName("progress") val progress: String = "finished",
     val recommend: List<String>? = null,
+    /** Student-facing difficulty summary (agent-written); displayed to the student. */
+    @SerialName("difficulty_summary") val difficultySummary: String = "",
+    /** Learning record for the memory system only — never shown to the student. */
     val summary: String,
     val content: String,
 )

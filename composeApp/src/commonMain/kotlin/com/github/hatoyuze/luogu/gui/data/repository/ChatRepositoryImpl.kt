@@ -133,6 +133,12 @@ class ChatRepositoryImpl(
         }
     }
 
+    override suspend fun getMessage(messageId: String): ChatMessageDomainModel? {
+        return withContext(Dispatchers.Default) {
+            queries.selectMessageById(messageId).executeAsOneOrNull()?.toDomainModel()
+        }
+    }
+
     override suspend fun deleteMessages(sessionId: String) {
         withContext(Dispatchers.Default) {
             queries.deleteMessagesBySession(sessionId)

@@ -50,6 +50,18 @@ sealed interface MessageSegment {
         @SerialName("sm") val startedAtMs: Long,
         @SerialName("r") val answer: AskUserAnswer? = null,
     ) : MessageSegment
+
+    @Serializable
+    @SerialName("f")  // coach finished summary card — discriminator value
+    data class CoachFinished(
+        /** Memory-system record (agent-internal). Persisted locally for the memory
+         *  layer but NEVER rendered in any UI — see the coach prompt protocol. */
+        @SerialName("s") val summary: String,
+        @SerialName("r") val recommend: List<String> = emptyList(),
+        @SerialName("c") val content: String = "",
+        /** Student-facing difficulty summary written by the agent; rendered on the card. */
+        @SerialName("ds") val difficultySummary: String = "",
+    ) : MessageSegment
 }
 
 // ═══════════════════════════════════════════════════════════

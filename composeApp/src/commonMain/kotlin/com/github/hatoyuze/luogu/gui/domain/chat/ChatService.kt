@@ -42,6 +42,8 @@ interface ChatService {
             val summary: String,
             val recommend: List<String>?,
             val content: String,
+            /** Student-facing difficulty summary written by the agent (displayed; `summary` is not). */
+            val difficultySummary: String = "",
         ) : StreamEvent
         data class CoachCheckpoint(val checkpointJson: String) : StreamEvent
     }

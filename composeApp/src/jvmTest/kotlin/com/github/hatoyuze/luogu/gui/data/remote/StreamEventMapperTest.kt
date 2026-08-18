@@ -61,6 +61,44 @@ class StreamEventMapperTest {
     }
 
     @Test
+    fun coach_prettyPrintedInit_shouldMapToCoachInit() = runTest {
+        val events = StreamEventMapper().map(
+            flowOf(ChatChunk.ContentDelta("""
+                {
+                  "progress": "init",
+                  "selected": "P1001",
+                  "content": "看题"
+                }
+            """.trimIndent())),
+            SessionType.COACH,
+        ).toList()
+        val init = assertIs<ChatService.StreamEvent.CoachInit>(events[0])
+        assertEquals("P1001", init.pid)
+        assertEquals("看题", init.content)
+    }
+
+    @Test
+    fun coach_finished_shouldCarryRecommendAndDifficultySummary() = runTest {
+        val events = StreamEventMapper().map(
+            flowOf(ChatChunk.ContentDelta("""
+                {
+                  "progress": "finished",
+                  "recommend": ["SP1043", "P4513"],
+                  "difficulty_summary": "本次难点：pref/suf 合并边界。",
+                  "summary": "内部记忆记录（不展示）。",
+                  "content": "加油！"
+                }
+            """.trimIndent())),
+            SessionType.COACH,
+        ).toList()
+        val finished = assertIs<ChatService.StreamEvent.CoachFinished>(events[0])
+        assertEquals(listOf("SP1043", "P4513"), finished.recommend)
+        assertEquals("本次难点：pref/suf 合并边界。", finished.difficultySummary)
+        assertEquals("内部记忆记录（不展示）。", finished.summary)
+        assertEquals("加油！", finished.content)
+    }
+
+    @Test
     fun errorInsideStream_shouldEmitErrorEvent() = runTest {
         val events = StreamEventMapper().map(
             flow { throw RuntimeException("boom") },
