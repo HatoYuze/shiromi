@@ -62,7 +62,7 @@ object LuoguSessionExtractor {
 
         val merged = LinkedHashMap<String, String>()
         parseCookieString(nativeCookie).forEach { (k, v) -> if (v.isNotBlank()) merged[k] = v }
-        parseCookieString(jsCookie).forEach { (k, v) -> if (v.isNotBlank()) merged.putIfAbsent(k, v) }
+        parseCookieString(jsCookie).forEach { (k, v) -> if (v.isNotBlank() && !merged.containsKey(k)) merged[k] = v }
 
         val (feUid, feName) = parseUserJson(userJson)
         val uid = merged["_uid"]?.toIntOrNull()?.takeIf { it > 0 } ?: feUid
