@@ -39,6 +39,14 @@ dat/
 
 /local.properties
 
+# Android signing keys — never commit
+*.jks
+*.keystore
+keystore.properties
+
+# Agent tooling artifacts — never commit
+.dsh-vision-router/
+
 # Local sandbox
 /run/
 /debug-sandbox

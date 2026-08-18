@@ -29,6 +29,7 @@ dependencyResolutionManagement {
 
 include(":composeApp")
 include(":lib:luogu-protocol")
+include(":lib:sqlite-slim")
 
 // Vendored wvbridge fork (lib/wvbridge) — adds native cookie access for the
 // embedded Luogu login WebView. Composite build substitutes the

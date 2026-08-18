@@ -1,6 +1,8 @@
 [versions]
 kotlin = "2.3.21"
-agp = "8.8.2"
+# 8.13.2：与 vendored wvbridge 复合构建（lib/wvbridge，com.android.kotlin.multiplatform.library）对齐；
+# 同一构建不允许并存多个 AGP 版本。Gradle 8.14.3 已满足其最低要求。
+agp = "8.13.2"
 compose = "1.11.1"
 composeMaterial3 = "1.11.0-alpha07"
 lifecycle = "2.11.0-beta01"
@@ -18,7 +20,9 @@ markdown = "0.29.0"
 ratex = "0.1.11"
 kompressor = "0.5.0"
 zstdNative = "1.5.7.4"
-sqliteJdbc = "3.44.1.0"
+# 3.45.2.0：与 sqldelight sqlite-driver 2.0.2 的传递要求一致（其强制 3.45.x），
+# 避免 catalog 声明值与实际解析值分叉（composeApp 另有 force 兜底）。
+sqliteJdbc = "3.45.2.0"
 deepseekHelper = "0.2.0"
 pipette = "2.0.0"
 composables = "1.20.0"
