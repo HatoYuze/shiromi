@@ -41,10 +41,10 @@ API_EXPORT(jstring, getCookieString, jlong handle, jstring url) {
 
         WebKitWebsiteDataManager *dataManager = webkit_web_context_get_website_data_manager(
             webkit_web_view_get_context(ctx->webview));
-        WebKitCookieManager *cookieManager = webkit_website_data_manager_get_cookies_manager(dataManager);
+        WebKitCookieManager *cookieManager = webkit_website_data_manager_get_cookie_manager(dataManager);
 
         auto *completionPtr = new std::shared_ptr<std::promise<Result>>(completion);
-        webkit_cookie_manager_get_cookies_async(
+        webkit_cookie_manager_get_cookies(
             cookieManager,
             uri.c_str(),
             nullptr,
@@ -54,7 +54,8 @@ API_EXPORT(jstring, getCookieString, jlong handle, jstring url) {
                 delete completionHolder;
 
                 GError *error = nullptr;
-                GSList *cookies = webkit_cookie_manager_get_cookies_finish(
+                // WebKitGTK 2.52：finish 返回 GList*（元素为 SoupCookie*）
+                GList *cookies = webkit_cookie_manager_get_cookies_finish(
                     WEBKIT_COOKIE_MANAGER(object),
                     asyncResult,
                     &error
@@ -70,17 +71,17 @@ API_EXPORT(jstring, getCookieString, jlong handle, jstring url) {
 
                 std::string parts;
                 guint count = 0;
-                for (GSList *l = cookies; l; l = l->next) {
+                for (GList *l = cookies; l; l = l->next) {
                     count++;
-                    WebKitCookie *cookie = WEBKIT_COOKIE(l->data);
-                    const gchar *name = webkit_cookie_get_name(cookie);
-                    const gchar *value = webkit_cookie_get_value(cookie);
+                    SoupCookie *cookie = static_cast<SoupCookie *>(l->data);
+                    const gchar *name = soup_cookie_get_name(cookie);
+                    const gchar *value = soup_cookie_get_value(cookie);
                     if (!parts.empty()) parts += "; ";
                     parts += name ? name : "";
                     parts += "=";
                     parts += value ? value : "";
                 }
-                g_slist_free_full(cookies, g_object_unref);
+                g_list_free_full(cookies, reinterpret_cast<GDestroyNotify>(soup_cookie_free));
 
                 LOGGER_V("getCookieString: async callback done, %u cookies", count);
                 completion->set_value(Result{true, parts, ""});
