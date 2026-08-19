@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package com.github.hatoyuze.luogu.gui.presentation.home
 
 import androidx.compose.foundation.BorderStroke
@@ -144,7 +148,7 @@ internal fun HomeSidebar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    AppIcons.Lightbulb,
+                    AppIcons.FavoriteIcon,
                     contentDescription = null,
                     modifier = Modifier.size(15.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),

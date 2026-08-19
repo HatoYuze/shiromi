@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 @file:OptIn(
     androidx.compose.material3.ExperimentalMaterial3Api::class,
     io.github.hatoyuze.deepseek.protocol.api.ExperimentalDeepseekApi::class,

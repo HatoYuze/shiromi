@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // sqlite-jdbc 平台裁剪包：为桌面分发目标生成只含目标平台原生库的 sqlite-jdbc jar。
 // 仅当构建带 -Pdist=windows|linux|macos 时，composeApp 通过 dependencySubstitution
 // 用本项目替换 org.xerial:sqlite-jdbc；开发运行（run，无 -Pdist）仍使用官方全量 jar。

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # shiromi — R8 混淆/裁剪规则（Android release）
 # 目标：在开启 minify 后保住序列化、DI、原生库加载等反射路径。
 

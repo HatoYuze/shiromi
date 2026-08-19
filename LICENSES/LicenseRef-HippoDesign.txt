@@ -1,0 +1,17 @@
+# LicenseRef-HippoDesign
+
+Hippo Design 官方图标库（Hippo Design Official Icon Library）
+
+## 授权条款（Declared Terms）
+
+按第三方镜像站 veryicon.com 对同一 180 图标包的声明：
+
+> License: Free for personal and commercial purpose.
+
+（参见 https://www.veryicon.com/icons/miscellaneous/hippo-design-official-icon-library/ ）
+
+## 说明（Note）
+
+- 本项目仅使用其中 12 个图标（路径见
+  composeApp/.../presentation/components/icons/AppIconGlyphs.kt），并以 Compose
+  ImageVector 形式二次封装，未对图形本身做修改。

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.kotlin.serialization) apply false
