@@ -76,6 +76,8 @@ import com.github.hatoyuze.luogu.gui.domain.model.ChatBranchDomainModel
 import com.github.hatoyuze.luogu.gui.domain.model.ChatMessageDomainModel
 import com.github.hatoyuze.luogu.gui.domain.model.MessageSegment
 import com.github.hatoyuze.luogu.gui.domain.model.MessageStatus
+import com.github.hatoyuze.luogu.gui.presentation.adaptive.PlatformSizeClass
+import com.github.hatoyuze.luogu.gui.presentation.adaptive.calculatePlatformSizeClass
 import com.github.hatoyuze.luogu.gui.presentation.components.AnimatedBorderBox
 import com.github.hatoyuze.luogu.gui.presentation.components.ChatSidebar
 import com.github.hatoyuze.luogu.gui.presentation.components.MessageActionBar
@@ -157,6 +159,8 @@ fun ChatScreen(
                     pid = pid,
                     onBack = { problemDetailPid = null },
                     modifier = Modifier.fillMaxSize(),
+                    // 桌面窄窗也可预览移动端布局：overlay 跟随尺寸类切换紧凑/桌面样式
+                    compact = calculatePlatformSizeClass() == PlatformSizeClass.Compact,
                 )
             }
         }

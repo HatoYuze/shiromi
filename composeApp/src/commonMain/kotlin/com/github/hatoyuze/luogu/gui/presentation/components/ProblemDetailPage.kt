@@ -3,6 +3,7 @@ package com.github.hatoyuze.luogu.gui.presentation.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import com.github.hatoyuze.luogu.gui.platform.copyTextToClipboard
 import androidx.compose.ui.text.AnnotatedString
@@ -57,6 +59,7 @@ fun ProblemDetailPage(
     onBack: () -> Unit,
     onCoachWithProblem: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val chatService = koinInject<ChatService>()
     val scope = rememberCoroutineScope()
@@ -80,9 +83,10 @@ fun ProblemDetailPage(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        // 移动端（compact）：全屏页，无圆角卡片边框；桌面保持卡片样式。
+        shape = if (compact) RoundedCornerShape(0.dp) else RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        border = if (compact) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
         shadowElevation = 0.dp,
     ) {
         when {
@@ -92,6 +96,7 @@ fun ProblemDetailPage(
                 detail = problemData!!.problem,
                 onBack = onBack,
                 onCoachWithProblem = onCoachWithProblem,
+                compact = compact,
             )
         }
     }
@@ -130,7 +135,12 @@ private fun ProblemDetailContent(
     detail: ProblemDetail,
     onBack: () -> Unit,
     onCoachWithProblem: ((String) -> Unit)?,
+    compact: Boolean,
 ) {
+    if (compact) {
+        ProblemDetailContentCompact(detail, onBack, onCoachWithProblem)
+        return
+    }
     // Extract fields for smart-casting
     val inputFormat = detail.inputFormat
     val outputFormat = detail.outputFormat
@@ -197,6 +207,245 @@ private fun ProblemDetailContent(
                 modifier = Modifier.weight(0.28f).fillMaxHeight(),
             )
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Compact content — 移动端（窄屏）专用布局
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+private fun ProblemDetailContentCompact(
+    detail: ProblemDetail,
+    onBack: () -> Unit,
+    onCoachWithProblem: ((String) -> Unit)?,
+) {
+    val inputFormat = detail.inputFormat
+    val outputFormat = detail.outputFormat
+    val samples = detail.samples
+    val hint = detail.hint
+
+    Column(Modifier.fillMaxSize()) {
+        // ── 顶栏：返回 + 标题(2行) + 教练模式 pill ──
+        ProblemDetailTopBarCompact(
+            title = "${detail.pid} ${detail.name}",
+            onBack = onBack,
+            onCoachWithProblem = onCoachWithProblem?.let { { it(detail.pid) } },
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+
+        // ── 统计条：提交/通过/时间/内存 四列 ──
+        ProblemStatsStrip(detail)
+
+        // ── 正文滚动区 ──
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        ) {
+            // 题目信息（难度/标签/pid/历史分数）折叠卡
+            ProblemInfoCard(detail)
+            Spacer(Modifier.height(12.dp))
+
+            if (detail.description.isNotBlank()) {
+                MarkdownSection("题目描述", detail.description)
+                Spacer(Modifier.height(12.dp))
+            }
+            if (!inputFormat.isNullOrBlank()) {
+                MarkdownSection("输入格式", inputFormat)
+                Spacer(Modifier.height(12.dp))
+            }
+            if (!outputFormat.isNullOrBlank()) {
+                MarkdownSection("输出格式", outputFormat)
+                Spacer(Modifier.height(12.dp))
+            }
+            if (!samples.isNullOrEmpty()) {
+                Text(
+                    text = "输入输出样例",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                samples.forEachIndexed { idx, sample ->
+                    SampleBlockWithCopy(idx + 1, sample.input, sample.output, stacked = true)
+                    Spacer(Modifier.height(8.dp))
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+            if (!hint.isNullOrBlank()) {
+                MarkdownSection("说明/提示", hint)
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // ── 底部常驻操作栏（教练模式）──
+        if (onCoachWithProblem != null) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Button(
+                    onClick = { onCoachWithProblem(detail.pid) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Icon(FeatherIcons.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("用教练模式讲解这道题")
+                }
+            }
+        }
+    }
+}
+
+/** 移动端顶栏：返回 + 标题（最多两行）+ 教练模式 pill。 */
+@Composable
+private fun ProblemDetailTopBarCompact(
+    title: String,
+    onBack: () -> Unit,
+    onCoachWithProblem: (() -> Unit)?,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(FeatherIcons.ChevronLeft, contentDescription = "返回")
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+        if (onCoachWithProblem != null) {
+            Spacer(Modifier.width(6.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable(onClick = onCoachWithProblem),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(FeatherIcons.Send, contentDescription = null, modifier = Modifier.size(13.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary)
+                    Spacer(Modifier.width(4.dp))
+                    Text("教练模式", fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary)
+                }
+            }
+        }
+    }
+}
+
+/** 移动端统计条：提交/通过/时间限制/内存限制 四列。 */
+@Composable
+private fun ProblemStatsStrip(detail: ProblemDetail) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            CompactStatCell("提交", formatCount2(detail.totalSubmit), Modifier.weight(1f))
+            CompactStatCell("通过", formatCount2(detail.totalAccepted), Modifier.weight(1f))
+            CompactStatCell("时间限制", detail.timeLimit?.let { formatTimeLimitInline(it) } ?: "—", Modifier.weight(1f))
+            CompactStatCell("内存限制", detail.memoryLimit?.let { formatMemoryLimitInline(it) } ?: "—", Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun CompactStatCell(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        Spacer(Modifier.height(2.dp))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/** 移动端「题目信息」折叠卡：难度 / 题目编号 / 历史分数 / 标签 chips。 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProblemInfoCard(detail: ProblemDetail) {
+    var expanded by remember { mutableStateOf(false) }
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+            ) {
+                Text("题目信息", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f))
+                Icon(
+                    FeatherIcons.ChevronDown,
+                    contentDescription = if (expanded) "收起" else "展开",
+                    modifier = Modifier.size(16.dp).rotate(if (expanded) 180f else 0f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                )
+            }
+            if (expanded) {
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                Spacer(Modifier.height(10.dp))
+                MetaRowCompact("题目编号") { Text(detail.pid, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
+                Spacer(Modifier.height(10.dp))
+                MetaRowCompact("难度") { DifficultyBadgeInline(detail.difficulty) }
+                Spacer(Modifier.height(10.dp))
+                MetaRowCompact("历史分数") { Text("暂无", fontSize = 13.sp) }
+                if (detail.tags.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    MetaRowCompact("标签") {
+                        val tags = remember(detail.tags) { LuoguTags.resolveTags(detail.tags) }
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            tags.forEach { tag ->
+                                Surface(shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)) {
+                                    Text(tag.name, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetaRowCompact(label: String, content: @Composable () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.width(58.dp))
+        content()
     }
 }
 
@@ -382,43 +631,57 @@ private fun rememberCompactDetailTypography(): com.mikepenz.markdown.model.Markd
 // ═══════════════════════════════════════════════════════════
 
 @Composable
-private fun SampleBlockWithCopy(index: Int, input: String, output: String) {
-    val scope = rememberCoroutineScope()
+private fun SampleBlockWithCopy(
+    index: Int,
+    input: String,
+    output: String,
+    stacked: Boolean = false,
+) {
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(modifier = Modifier.padding(10.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("输入 #$index", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    IconButton(onClick = { scope.launch { copyTextToClipboard(input) } }, modifier = Modifier.size(20.dp)) {
-                        Icon(FeatherIcons.Copy, contentDescription = "复制输入", modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-                    SelectionContainer {
-                        Text(input, modifier = Modifier.padding(8.dp).fillMaxWidth(), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                }
+        if (stacked) {
+            // 移动端：输入/输出上下堆叠
+            Column(modifier = Modifier.padding(10.dp)) {
+                SampleBlock("输入 #$index", input)
+                Spacer(Modifier.height(10.dp))
+                SampleBlock("输出 #$index", output)
             }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("输出 #$index", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    IconButton(onClick = { scope.launch { copyTextToClipboard(output) } }, modifier = Modifier.size(20.dp)) {
-                        Icon(FeatherIcons.Copy, contentDescription = "复制输出", modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-                    SelectionContainer {
-                        Text(output, modifier = Modifier.padding(8.dp).fillMaxWidth(), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
-                    }
+        } else {
+            // 桌面：输入/输出并排
+            Row(modifier = Modifier.padding(10.dp)) {
+                SampleBlock("输入 #$index", input, Modifier.weight(1f))
+                Spacer(Modifier.width(10.dp))
+                SampleBlock("输出 #$index", output, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** 单个样例块（标签 + 复制 + 等宽内容，长行可横向滚动）。 */
+@Composable
+private fun SampleBlock(
+    label: String,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    Column(modifier = modifier) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(onClick = { scope.launch { copyTextToClipboard(text) } }, modifier = Modifier.size(20.dp)) {
+                Icon(FeatherIcons.Copy, contentDescription = "复制$label", modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
+            SelectionContainer {
+                // 长行可横向滚动（样例多为窄屏，避免被裁切）
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    Text(text, modifier = Modifier.padding(8.dp).fillMaxWidth(), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }

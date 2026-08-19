@@ -1,7 +1,6 @@
 package com.github.hatoyuze.luogu.gui.presentation
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -110,28 +109,22 @@ fun MobileHomeScreen(
 
         // ── 题目详情（紧凑端全屏化，无遮罩；返回关闭）──
         if (problemDetailPid != null) {
-            Box(Modifier.fillMaxSize()) {
-                Box(
-                    Modifier.fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.16f))
-                        .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
-                            problemDetailPid = null
-                        },
-                )
-                Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-                    ProblemDetailPage(
-                        pid = problemDetailPid!!,
-                        prefetchedData = state.dailyProblemState.problemDetail,
-                        onBack = { problemDetailPid = null },
-                        onCoachWithProblem = { pid ->
-                            chatViewModel.handleEvent(ChatEvent.CreateNewSession(SessionType.COACH))
-                            chatViewModel.handleEvent(ChatEvent.SendMessage("我想要学习 $pid 这道题"))
-                            problemDetailPid = null
-                            onOpenChat()
-                        },
-                    )
-                }
-            }
+            ProblemDetailPage(
+                pid = problemDetailPid!!,
+                // 只有预取数据属于被搜索的题目时才复用，避免展示错题（与桌面 HomeScreen 一致）
+                prefetchedData = state.dailyProblemState.problemDetail?.takeIf {
+                    it.problem.pid.equals(problemDetailPid, ignoreCase = true)
+                },
+                onBack = { problemDetailPid = null },
+                onCoachWithProblem = { pid ->
+                    chatViewModel.handleEvent(ChatEvent.CreateNewSession(SessionType.COACH))
+                    chatViewModel.handleEvent(ChatEvent.SendMessage("我想要学习 $pid 这道题"))
+                    problemDetailPid = null
+                    onOpenChat()
+                },
+                modifier = Modifier.fillMaxSize(),
+                compact = true,
+            )
         }
     }
 }
