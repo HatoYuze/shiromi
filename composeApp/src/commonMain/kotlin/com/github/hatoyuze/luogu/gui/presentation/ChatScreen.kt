@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -73,6 +74,7 @@ import androidx.compose.ui.unit.sp
 
 import com.github.hatoyuze.luogu.gui.domain.model.ChatBranchDomainModel
 import com.github.hatoyuze.luogu.gui.domain.model.ChatMessageDomainModel
+import com.github.hatoyuze.luogu.gui.domain.model.MessageSegment
 import com.github.hatoyuze.luogu.gui.domain.model.MessageStatus
 import com.github.hatoyuze.luogu.gui.presentation.components.AnimatedBorderBox
 import com.github.hatoyuze.luogu.gui.presentation.components.ChatSidebar
@@ -343,6 +345,22 @@ private fun MainContent(
 }
 
 
+/**
+ * 智能贴底判定：最后可见项位于末尾 2 项内（即视口下方至多 1 项）时允许自动跟随；
+ * 用户上翻阅读（离开底部）时返回 false，不打扰。
+ */
+internal fun shouldAutoFollow(
+    lastVisibleIndex: Int,
+    totalItemsCount: Int,
+): Boolean = totalItemsCount <= 0 || lastVisibleIndex >= totalItemsCount - 2
+
+private fun shouldAutoFollow(state: LazyListState): Boolean {
+    // 用户正在主动滚动时绝不抢滚动
+    if (state.isScrollInProgress) return false
+    val info = state.layoutInfo
+    return shouldAutoFollow(info.visibleItemsInfo.lastOrNull()?.index ?: 0, info.totalItemsCount)
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun ChatMessages(
@@ -363,13 +381,23 @@ internal fun ChatMessages(
         if (messages.isNotEmpty()) state.animateScrollToItem(messages.size - 1)
     }
 
-    // 流式输出：最后一条消息内容持续增长（size 不变）→ 无动画贴底跟随，
-    // 解决 agent 更新信息时列表"悬停"不自动下拉的问题。
-    // 仅移动端（compact）启用，桌面保持原有"仅新消息滚动"行为。
+    // 流式输出智能贴底（仅移动端 compact）：
+    // - key 覆盖思考流（segments 增长）与内容流（content 增长），思考期间也能跟随；
+    // - 布局判定走 snapshotFlow：内容增长（key 变化）或布局变化（滚动/测量）都会触发
+    //   重新评估，且滚动进行中/用户已上翻（shouldAutoFollow=false）绝不打扰；
+    // - 滚动到 index == itemCount（被钳制到内容末尾），确保看到最新尾部而非项顶。
     if (compact) {
         val lastMessage = messages.lastOrNull()
-        LaunchedEffect(lastMessage?.id, lastMessage?.content?.length) {
-            if (messages.isNotEmpty()) state.scrollToItem(messages.size - 1)
+        LaunchedEffect(
+            lastMessage?.id,
+            lastMessage?.segments?.size,
+            lastMessage?.segments?.lastOrNull()?.let { seg -> (seg as? MessageSegment.Text)?.text?.length } ?: 0,
+            lastMessage?.content?.length,
+        ) {
+            if (messages.isNotEmpty()) {
+                snapshotFlow { shouldAutoFollow(state) }
+                    .collect { nearBottom -> if (nearBottom) state.scrollToItem(messages.size) }
+            }
         }
     }
 

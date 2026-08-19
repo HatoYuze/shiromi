@@ -55,6 +55,7 @@ fun ThinkingSection(
     content: String,
     toolCalls: List<ToolCallInfo>? = null,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val accentColor = colorScheme.secondary
@@ -143,7 +144,10 @@ fun ThinkingSection(
                                         color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                                         lineHeight = 20.sp,
                                     ),
-                                    modifier = Modifier
+                                    // 移动端（compact）：内容并入消息项、由外层 LazyColumn
+                                    // 统一滚动，避免项内 verticalScroll 抢占触摸手势导致
+                                    // 「展开思考链后无法下滑」；桌面保留限高内滚。
+                                    modifier = if (compact) Modifier else Modifier
                                         .heightIn(max = 400.dp)
                                         .verticalScroll(rememberScrollState()),
                                 )
@@ -153,6 +157,7 @@ fun ThinkingSection(
                             ToolCallList(
                                 toolCalls = toolCalls,
                                 modifier = Modifier.padding(top = if (content.isNotBlank()) 8.dp else 0.dp),
+                                compact = compact,
                             )
                         }
                     }

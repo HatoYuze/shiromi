@@ -53,6 +53,7 @@ import kotlinx.serialization.json.Json
 fun ToolCallList(
     toolCalls: List<ToolCallInfo>,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -62,6 +63,7 @@ fun ToolCallList(
             ToolCallSection(
                 toolCall = toolCall,
                 modifier = Modifier.fillMaxWidth(),
+                compact = compact,
             )
         }
     }
@@ -78,6 +80,7 @@ fun ToolCallList(
 fun ToolCallSection(
     toolCall: ToolCallInfo,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val accentColor = if (toolCall.isError) colorScheme.error else colorScheme.tertiary
@@ -173,10 +176,16 @@ fun ToolCallSection(
                     color = accentColor.copy(alpha = 0.03f),
                 ) {
                     Column(
-                        modifier = Modifier
-                            .heightIn(max = 400.dp)
-                            .padding(12.dp)
-                            .verticalScroll(rememberScrollState()),
+                        // 移动端（compact）：并入消息项由外层滚动，避免项内 verticalScroll
+                        // 抢占触摸手势；桌面保留限高内滚。
+                        modifier = if (compact) {
+                            Modifier.padding(12.dp)
+                        } else {
+                            Modifier
+                                .heightIn(max = 400.dp)
+                                .padding(12.dp)
+                                .verticalScroll(rememberScrollState())
+                        },
                     ) {
                         // Arguments section
                         SectionLabel("Arguments")

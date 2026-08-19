@@ -10,13 +10,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,10 +33,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -42,6 +47,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
@@ -187,6 +194,7 @@ fun MessageBubble(
                                 content = message.thinkingContent ?: "",
                                 toolCalls = message.toolCalls,
                                 modifier = Modifier.padding(horizontal = 8.dp),
+                                compact = compact,
                             )
                         }
                         // Inline editing mode for user messages
@@ -389,6 +397,7 @@ private fun SegmentedBody(
             isStreaming = isStreaming,
             thinkingElapsedSec = thinkingElapsedSec,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            compact = compact,
         )
     }
 
@@ -446,6 +455,7 @@ private fun ThinkingTimeline(
     isStreaming: Boolean,
     thinkingElapsedSec: Int? = null,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val accentColor = colorScheme.secondary
@@ -485,44 +495,104 @@ private fun ThinkingTimeline(
             }
 
             // ── Timeline body ──
-            AnimatedVisibility(visible = expanded) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 12.dp, top = 6.dp, bottom = 12.dp, end = 12.dp)
-                        .drawBehind {
-                            // Continuous vertical line — node column is 16dp wide,
-                            // line passes through its center at 8dp from this Box's origin.
-                            val lineX = 8.dp.toPx()
-                            drawLine(
-                                color = accentColor.copy(alpha = 0.2f),
-                                start = Offset(lineX, 0f),
-                                end = Offset(lineX, size.height),
-                                strokeWidth = 1.5.dp.toPx(),
-                            )
-                        }
-                        .drawBehind {
-                            // Subtle gradient fade at the bottom of the timeline
-                            val fadeStart = (size.height - 24.dp.toPx()).coerceAtLeast(0f)
-                            drawRect(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, accentColor.copy(alpha = 0.04f)),
-                                    startY = fadeStart,
-                                    endY = size.height,
-                                )
-                            )
-                        }
-                ) {
-                    Column {
-                        items.forEachIndexed { idx, item ->
-                            TimelineRow(
-                                item = item,
-                                accentColor = accentColor,
-                                isFirst = idx == 0,
-                            )
-                        }
-                    }
+            // 移动端（compact）：流式时不用 AnimatedVisibility 尺寸动画（避免逐 token
+            // 高度抖动），展开体限高 + 内部滚动 + 贴底跟随；桌面保持原展开动画。
+            if (compact) {
+                if (expanded) {
+                    ThinkingTimelineBody(
+                        items = items,
+                        accentColor = accentColor,
+                        isStreaming = isStreaming,
+                    )
                 }
+            } else {
+                AnimatedVisibility(visible = expanded) {
+                    ThinkingTimelineBody(
+                        items = items,
+                        accentColor = accentColor,
+                        isStreaming = isStreaming,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 时间线展开体（移动端限高内滚版）。
+ *
+ * - 高度上限 ≈ 视口 40%（[LocalWindowInfo] 换算，夹在 160..480dp），超长内容内部滚动，
+ *   滚动到边缘时经 nested scroll 交还外层 LazyColumn，解决「展开后无法下滑」；
+ * - 流式时若用户停留在内滚底部则自动贴底跟随最新思考，上翻阅读则暂停跟随。
+ */
+@Composable
+private fun ThinkingTimelineBody(
+    items: List<MessageSegment>,
+    accentColor: Color,
+    isStreaming: Boolean,
+) {
+    val innerScroll = rememberScrollState()
+    val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
+    val maxBodyHeight = remember(windowInfo.containerSize.height, density) {
+        with(density) { (windowInfo.containerSize.height * 0.4f).toDp() }.coerceIn(160.dp, 480.dp)
+    }
+
+    // 内滚跟随（单一协程，无跨协程竞态）：流式时若用户停留在底部附近则自动贴底，
+    // 上翻阅读则暂停；内容增长（maxValue 变化）也会在同一收集器内重新判定并贴底。
+    // 「上翻」= 值显著减小（>24px）；「回到底部」= 值回到 max-24 内。
+    LaunchedEffect(innerScroll, isStreaming) {
+        if (!isStreaming) return@LaunchedEffect
+        var follow = true
+        var lastValue = 0
+        snapshotFlow { innerScroll.value to innerScroll.maxValue }
+            .collect { (value, max) ->
+                if (value < lastValue - 24f) follow = false
+                else if (value >= max - 24f) follow = true
+                lastValue = value
+                if (follow && value < max) innerScroll.scrollTo(max)
+            }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, top = 6.dp, bottom = 12.dp, end = 12.dp)
+            .drawBehind {
+                // Continuous vertical line — node column is 16dp wide,
+                // line passes through its center at 8dp from this Box's origin.
+                val lineX = 8.dp.toPx()
+                drawLine(
+                    color = accentColor.copy(alpha = 0.2f),
+                    start = Offset(lineX, 0f),
+                    end = Offset(lineX, size.height),
+                    strokeWidth = 1.5.dp.toPx(),
+                )
+            }
+            .drawBehind {
+                // Subtle gradient fade at the bottom of the timeline
+                val fadeStart = (size.height - 24.dp.toPx()).coerceAtLeast(0f)
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, accentColor.copy(alpha = 0.04f)),
+                        startY = fadeStart,
+                        endY = size.height,
+                    )
+                )
+            }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = maxBodyHeight)
+                .verticalScroll(innerScroll),
+        ) {
+            items.forEachIndexed { idx, item ->
+                TimelineRow(
+                    item = item,
+                    accentColor = accentColor,
+                    isFirst = idx == 0,
+                )
             }
         }
     }
