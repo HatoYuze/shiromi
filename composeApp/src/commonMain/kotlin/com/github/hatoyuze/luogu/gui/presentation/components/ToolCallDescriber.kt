@@ -1,12 +1,15 @@
 package com.github.hatoyuze.luogu.gui.presentation.components
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -15,9 +18,11 @@ import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.luogu.gui.domain.model.ToolCallInfo
 import com.github.hatoyuze.luogu.skill.api.DifficultyLevel
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Human-readable descriptions for tool calls in the thinking timeline.
@@ -34,7 +39,11 @@ object ToolCallDescriber {
 
     @Composable
     fun Describe(toolCall: ToolCallInfo) {
-        val args = try { json.parseToJsonElement(toolCall.arguments).jsonObject } catch (_: Exception) { null }
+        // 按 arguments 记忆解析结果：流式 token 每帧重走 Describe 时避免重复 JSON 解析
+        // （工具行数量有限，但逐 token 解析纯属浪费）。
+        val args = remember(toolCall.arguments) {
+            try { json.parseToJsonElement(toolCall.arguments).jsonObject } catch (_: Exception) { null }
+        }
         when (toolCall.name) {
             "luogu_get_filters" -> Text("获取筛选条件", fontSize = 13.sp)
             "luogu_get_practice" -> Text("查看做题记录", fontSize = 13.sp)
@@ -49,50 +58,117 @@ object ToolCallDescriber {
         }
     }
 
+    /** `luogu_search_problems` 参数的纯数据视图（可测试，供 FlowRow 排版）。 */
+    data class SearchProblemsParts(
+        val keyword: String?,
+        val tags: List<String>,
+        val difficultyMin: Int?,
+        val difficultyMax: Int?,
+        val sortBy: String?,
+    )
+
+    // ── 安全访问器：LLM 提供的参数可能类型不符（如 keyword 为数组），
+    //    一律用 as? 而非抛异常的 jsonPrimitive/jsonArray，避免组合期崩溃。──
+
+    private fun JsonObject.optString(key: String): String? =
+        (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content?.takeIf { it.isNotBlank() }
+
+    private fun JsonObject.optInt(key: String): Int? = optString(key)?.toIntOrNull()
+
+    private fun JsonObject.optStringArray(key: String): List<String> =
+        (this[key] as? JsonArray)?.mapNotNull { item ->
+            (item as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content?.takeIf { it.isNotBlank() }
+        } ?: emptyList()
+
+    /** 解析搜索参数；全部为空时返回 null。tag 支持逗号/顿号/分号/空白分隔的多个标签。 */
+    fun parseSearchProblemsParts(args: JsonObject?): SearchProblemsParts? {
+        if (args == null) return null
+        val keyword = args.optString("keyword")
+        val tags = args.optString("tag")
+            ?.split(',', '，', ';', '；', '、', ' ', '\n', '\t')
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+        val dMin = args.optInt("difficulty_min")
+        val dMax = args.optInt("difficulty_max")
+        val sortBy = args.optString("sort_by")
+        if (keyword == null && tags.isEmpty() && dMin == null && dMax == null && sortBy == null) return null
+        return SearchProblemsParts(keyword, tags, dMin, dMax, sortBy)
+    }
+
+    @OptIn(ExperimentalLayoutApi::class)
     @Composable
-    private fun DescribeSearchProblems(args: kotlinx.serialization.json.JsonObject?) {
-        val parts = mutableListOf<@Composable () -> Unit>()
-        args?.get("keyword")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }?.let {
-            parts.add { Text(it, fontWeight = FontWeight.Medium, fontSize = 13.sp) }
-        }
-        args?.get("tag")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }?.let {
-            parts.add { Text("标签$it", fontSize = 13.sp) }
-        }
-        val dMin = args?.get("difficulty_min")?.jsonPrimitive?.content?.toIntOrNull()
-        val dMax = args?.get("difficulty_max")?.jsonPrimitive?.content?.toIntOrNull()
-        if (dMin != null && dMax != null) {
-            parts.add { DifficultyBadge(dMin) }
-            if (dMin != dMax) {
-                parts.add { Text("~", fontSize = 13.sp) }
-                parts.add { DifficultyBadge(dMax) }
+    private fun DescribeSearchProblems(args: JsonObject?) {
+        val parts = parseSearchProblemsParts(args)
+            ?: run { Text("搜索题目", fontSize = 13.sp); return }
+        // FlowRow 换行排版：关键词/标签 chip/难度徽章/排序文案在窄屏下自然换行，
+        // 不再单行溢出（移动端思考链 tag 适配）。
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text("搜索题目", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            parts.keyword?.let {
+                Text(it, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
-        } else if (dMin != null) {
-            parts.add { Text("难度≥", fontSize = 13.sp) }
-            parts.add { DifficultyBadge(dMin) }
-        } else if (dMax != null) {
-            parts.add { Text("难度≤", fontSize = 13.sp) }
-            parts.add { DifficultyBadge(dMax) }
+            parts.tags.forEach { tag -> TagChip(tag) }
+            val dMin = parts.difficultyMin
+            val dMax = parts.difficultyMax
+            when {
+                dMin != null && dMax != null -> {
+                    Text("难度", fontSize = 13.sp)
+                    DifficultyBadge(dMin)
+                    if (dMin != dMax) {
+                        Text("~", fontSize = 13.sp)
+                        DifficultyBadge(dMax)
+                    }
+                }
+                dMin != null -> {
+                    Text("难度≥", fontSize = 13.sp)
+                    DifficultyBadge(dMin)
+                }
+                dMax != null -> {
+                    Text("难度≤", fontSize = 13.sp)
+                    DifficultyBadge(dMax)
+                }
+            }
+            parts.sortBy?.let {
+                Text("按${sortLabel(it)}排序", fontSize = 13.sp)
+            }
         }
-        args?.get("sort_by")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }?.let {
-            parts.add { Text("按${sortLabel(it)}排序", fontSize = 13.sp) }
+    }
+
+    /** 标签 chip：与题目卡 `ProblemTagsRow` 同一视觉语言（secondaryContainer 圆角胶囊）。 */
+    @Composable
+    private fun TagChip(text: String) {
+        Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+        ) {
+            Text(
+                text = "#$text",
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
         }
-        Row { parts.forEachIndexed { i, p -> if (i > 0) { Spacer(Modifier.width(4.dp)) }; p() } }
     }
 
     @Composable
-    private fun DescribeGetProblem(args: kotlinx.serialization.json.JsonObject?) {
-        val pid = args?.get("pid")?.jsonPrimitive?.content ?: "?"
+    private fun DescribeGetProblem(args: JsonObject?) {
+        val pid = args?.optString("pid") ?: "?"
         Text("查看题目 ", fontWeight = FontWeight.Normal, fontSize = 13.sp)
         Text(pid, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
 
     @Composable
-    private fun DescribeGetSolutions(args: kotlinx.serialization.json.JsonObject?) {
-        val pid = args?.get("pid")?.jsonPrimitive?.content ?: "?"
-        val limit = args?.get("limit")?.jsonPrimitive?.content?.toIntOrNull()
-        val ids = args?.get("solution_ids")?.jsonArray?.mapNotNull { it.jsonPrimitive.content }
+    private fun DescribeGetSolutions(args: JsonObject?) {
+        val pid = args?.optString("pid") ?: "?"
+        val limit = args?.optInt("limit")
+        val ids = args?.optStringArray("solution_ids")
         val extra = when {
-            !ids.isNullOrEmpty() -> "(指定篇)"
+            ids?.isNotEmpty() == true -> "(指定篇)"
             limit != null -> "(前${limit}篇)"
             else -> ""
         }
@@ -101,8 +177,8 @@ object ToolCallDescriber {
     }
 
     @Composable
-    private fun DescribeSearchTrainings(args: kotlinx.serialization.json.JsonObject?) {
-        val keyword = args?.get("keyword")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+    private fun DescribeSearchTrainings(args: JsonObject?) {
+        val keyword = args?.optString("keyword")
         if (keyword != null) {
             Text("搜索题单：", fontSize = 13.sp)
             Text(keyword, fontWeight = FontWeight.Medium, fontSize = 13.sp)
@@ -112,23 +188,23 @@ object ToolCallDescriber {
     }
 
     @Composable
-    private fun DescribeGetTraining(args: kotlinx.serialization.json.JsonObject?) {
-        val id = args?.get("id")?.jsonPrimitive?.content ?: "?"
+    private fun DescribeGetTraining(args: JsonObject?) {
+        val id = args?.optString("id") ?: "?"
         Text("查看题单 #$id", fontSize = 13.sp)
     }
 
     @Composable
-    private fun DescribeGetRecords(args: kotlinx.serialization.json.JsonObject?) {
-        val pid = args?.get("pid")?.jsonPrimitive?.content ?: "?"
-        val limit = args?.get("limit")?.jsonPrimitive?.content?.toIntOrNull()
+    private fun DescribeGetRecords(args: JsonObject?) {
+        val pid = args?.optString("pid") ?: "?"
+        val limit = args?.optInt("limit")
         Text("获取提交记录 ", fontSize = 13.sp)
         Text(pid, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         if (limit != null) Text("，最近${limit}条", fontSize = 13.sp)
     }
 
     @Composable
-    private fun DescribeGetRecord(args: kotlinx.serialization.json.JsonObject?) {
-        val id = args?.get("id")?.jsonPrimitive?.content ?: "?"
+    private fun DescribeGetRecord(args: JsonObject?) {
+        val id = args?.optString("id") ?: "?"
         Text("查看提交记录 #$id", fontSize = 13.sp)
     }
 
