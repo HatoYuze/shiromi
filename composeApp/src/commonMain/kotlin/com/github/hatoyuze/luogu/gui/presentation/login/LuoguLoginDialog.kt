@@ -40,6 +40,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.github.hatoyuze.luogu.gui.data.login.LuoguLoginVerifier
 import com.github.hatoyuze.luogu.gui.data.login.LuoguSession
 import com.github.hatoyuze.luogu.gui.data.login.LuoguSessionExtractor
+import com.github.hatoyuze.luogu.gui.platform.getWebViewCookieString
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
 import kotlinx.coroutines.Dispatchers
@@ -59,10 +60,15 @@ private const val LUOGU_WEBVIEW_UA =
 private const val LUOGU_HOST = "www.luogu.com.cn"
 
 /**
- * 判断是否为登录成功后的洛谷站内导航（host 精确匹配，排除登录页本身）。
- * 拒绝形似域名（如 `www.luogu.com.cn.evil.com`）。
+ * 判断是否为"登录成功后离开认证流程"的洛谷站内导航。
+ *
+ * 排除**整个 /auth/ 前缀**（登录页、/auth/unlock、OAuth 回调等中间路径），
+ * 避免外链登录（QQ/微信）流程中被误判为已登录；同时拒绝形似域名
+ * （如 `www.luogu.com.cn.evil.com`）。
+ *
+ * 边界归一：容忍无尾斜杠（`/auth`）、双斜杠（`//auth/login`）、大小写变体（`/Auth/...`）。
  */
-private fun isPostLoginNavigation(url: String): Boolean {
+internal fun isPostLoginNavigation(url: String): Boolean {
     val schemeEnd = url.indexOf("://")
     if (schemeEnd < 0) return false
     val rest = url.substring(schemeEnd + 3)
@@ -70,8 +76,19 @@ private fun isPostLoginNavigation(url: String): Boolean {
     val authority = if (pathStart < 0) rest else rest.substring(0, pathStart)
     val path = if (pathStart < 0) "" else rest.substring(pathStart)
     if (authority != LUOGU_HOST) return false
-    return !path.startsWith("/auth/login")
+    val normalized = path.trimStart('/')
+    return !(normalized.equals("auth", ignoreCase = true) ||
+        normalized.startsWith("auth/", ignoreCase = true))
 }
+
+/**
+ * 自动提取的组合闸：导航 URL 离开认证流程，且原生 cookie 存在已登录 `_uid`。
+ * 平台注意：cookie 通道依赖 expect/actual——iOS actual 暂返回 null（未接线原生读取），
+ * 该平台上预检恒不通过、自动提取不生效，由「登录完成，导入 Cookie」手动按钮兜底；
+ * Android/JVM 通道可用（CookieManager / fork JNI）。
+ */
+internal fun shouldTriggerExtraction(url: String, cookie: String?): Boolean =
+    isPostLoginNavigation(url) && LuoguSessionExtractor.hasLoggedInUid(cookie)
 
 private sealed interface LoginUiState {
     data object Browsing : LoginUiState
@@ -114,14 +131,26 @@ fun LuoguLoginDialog(
                 extractionRequested += 1
             }
 
-            // 登录成功后洛谷会跳离 /auth/login（HAR 证实 referer 链：auth/login → 首页）；
-            // 拦截到"离开登录页的 www.luogu.com.cn 导航"即自动触发提取。
+            // 登录成功后洛谷会跳离 /auth/ 认证流程（HAR 证实 referer 链：auth/login → 首页）。
+            // 拦截到合格导航后先做会话预检（原生 cookie 须含已登录 _uid），
+            // 避免外链登录（QQ/微信 OAuth 等）的中间导航被误判为已登录而提前提取。
             // 原生导航回调不在 UI 线程：只做轻量派发，状态读取与判定切回主线程执行。
             DisposableEffect(controller) {
                 val registry = controller.interceptor.registerNavigationInterceptor { url ->
                     scope.launch {
                         if (state == LoginUiState.Browsing && isPostLoginNavigation(url)) {
-                            triggerExtraction()
+                            // 预检通道异常（超时/引擎忙）视为"尚无会话"跳过本次，手动按钮兜底；
+                            // 与 extract() 的单通道容错模式保持一致。
+                            val cookie = try {
+                                getWebViewCookieString(controller, LuoguSessionExtractor.BASE_URL)
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                null
+                            }
+                            if (shouldTriggerExtraction(url, cookie)) {
+                                triggerExtraction()
+                            }
                         }
                     }
                     InterceptorHandler.Result.Allowed

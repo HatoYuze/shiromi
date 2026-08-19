@@ -91,6 +91,14 @@ object LuoguSessionExtractor {
         return result
     }
 
+    /**
+     * 会话预检：cookie 串中是否存在已登录 `_uid`（> 0）。
+     * 匿名会话无 `_uid`（服务端仅在登录后下发），故这是"已登录"的可靠信号，
+     * 用于外链登录等中间导航时避免误触发提取。
+     */
+    internal fun hasLoggedInUid(cookieString: String?): Boolean =
+        parseCookieString(cookieString)["_uid"]?.toIntOrNull()?.takeIf { it > 0 } != null
+
     /** 按会话白名单组装种子 cookie 串，保持插入顺序。 */
     internal fun buildCookieString(cookies: Map<String, String>): String = cookies
         .filterKeys { it in SESSION_COOKIES }

@@ -2,6 +2,7 @@ package com.github.hatoyuze.luogu.gui.data.login
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LuoguSessionExtractorTest {
@@ -61,5 +62,24 @@ class LuoguSessionExtractorTest {
         assertTrue(LuoguSessionExtractor.parseUserJson("not json").first == null)
         assertTrue(LuoguSessionExtractor.parseUserJson("""{"uid":0}""").first == null)
         assertTrue(LuoguSessionExtractor.parseUserJson("""{"uid":-5}""").first == null)
+    }
+
+    @Test fun `hasLoggedInUid true when uid cookie present and positive`() {
+        assertTrue(LuoguSessionExtractor.hasLoggedInUid("_uid=123; __client_id=abc; C3VK=xyz"))
+        assertTrue(LuoguSessionExtractor.hasLoggedInUid(" __client_id=abc; _uid=42 "))
+        assertTrue(LuoguSessionExtractor.hasLoggedInUid("_uid=01")) // 前导零可解析为 1
+        assertTrue(LuoguSessionExtractor.hasLoggedInUid("_uid = 123 ")) // 空白容忍
+        assertTrue(LuoguSessionExtractor.hasLoggedInUid("_uid=+5")) // 正号可解析
+    }
+
+    @Test fun `hasLoggedInUid false for anonymous, missing or malformed`() {
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid(null))
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid(""))
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid("_uid=0; __client_id=abc"))
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid("__client_id=abc"))
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid("_uid=abc"))
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid("_uid=123abc"))
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid("_uid=-5"))
+        assertFalse(LuoguSessionExtractor.hasLoggedInUid("my_uid=5"))
     }
 }
