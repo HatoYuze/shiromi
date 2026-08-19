@@ -18,6 +18,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.github.hatoyuze.luogu.gui.config.AppConfigStore
@@ -97,10 +99,23 @@ fun HomeScreen(
         }
 
         // ── EventEdit overlay (covers full window) ──
+        // 背景采用「暖色灯罩」径向渐变（设计稿 A3 方案①）：对话框背后留亮、
+        // 四周暖暗收边，替代黑色扁平遮罩，与「图书馆」暖纸主题一致。
         if (isDialogVisible) {
             Box(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.16f))
+                    .drawBehind {
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color(0xFF4A3C28).copy(alpha = 0.42f),
+                                ),
+                                center = center,
+                                radius = size.minDimension * 0.6f,
+                            )
+                        )
+                    }
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() })
                     { isDialogVisible = false; dialogContent = null })
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

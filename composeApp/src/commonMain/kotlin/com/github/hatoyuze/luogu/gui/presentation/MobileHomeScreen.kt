@@ -65,10 +65,8 @@ fun MobileHomeScreen(
 ) {
     val state by homeViewModel.state.collectAsState()
 
-    // ── Overlay state（事件编辑弹窗 / 题目详情，与桌面同构）──
+    // ── Overlay state（题目详情，事件编辑走 EventEditSheet 底部表单）──
     var problemDetailPid by remember { mutableStateOf<String?>(null) }
-    var dialogContent by remember { mutableStateOf<(@Composable () -> Unit)?>(null) }
-    var isDialogVisible by remember { mutableStateOf(false) }
 
     val tabTitles = listOf("日历", "今日", "待办")
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
@@ -93,8 +91,6 @@ fun MobileHomeScreen(
                     0 -> CalendarPage(
                         state = state,
                         homeViewModel = homeViewModel,
-                        showOverlay = { content -> dialogContent = content; isDialogVisible = true },
-                        hideOverlay = { isDialogVisible = false; dialogContent = null },
                     )
                     1 -> TodayPage(
                         state = state,
@@ -112,23 +108,7 @@ fun MobileHomeScreen(
             }
         }
 
-        // ── 事件编辑弹窗（全屏遮罩居中，复用 EventEditDialog）──
-        if (isDialogVisible) {
-            Box(Modifier.fillMaxSize()) {
-                Box(
-                    Modifier.fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.16f))
-                        .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
-                            isDialogVisible = false; dialogContent = null
-                        },
-                )
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    dialogContent?.invoke()
-                }
-            }
-        }
-
-        // ── 题目详情（紧凑端全屏化）──
+        // ── 题目详情（紧凑端全屏化，无遮罩；返回关闭）──
         if (problemDetailPid != null) {
             Box(Modifier.fillMaxSize()) {
                 Box(
@@ -244,8 +224,6 @@ private fun MobileHomeTopBar(onSettings: () -> Unit) {
 private fun CalendarPage(
     state: HomeViewModel.HomeUiState,
     homeViewModel: HomeViewModel,
-    showOverlay: (@Composable () -> Unit) -> Unit,
-    hideOverlay: () -> Unit,
 ) {
     val selected = state.calendarViewState.selectedDate ?: state.today
     val dayEvents = state.calendarEvents.filter { it.date == selected }
@@ -269,8 +247,6 @@ private fun CalendarPage(
                 homeViewModel.addCalendarEvent(name, date, color, pinned, allDay, timeMinutes)
             },
             onDeleteEvent = { homeViewModel.deleteCalendarEvent(it) },
-            showOverlay = showOverlay,
-            hideOverlay = hideOverlay,
             modifier = Modifier.fillMaxWidth(),
             compact = true,
         )

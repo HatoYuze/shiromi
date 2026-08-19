@@ -372,14 +372,12 @@ fun CalendarPanel(
         }
     }
 
-    // ── Push dialog content to parent via showOverlay ──
-    // 以请求序号为 key（而非日期值），避免「遮罩关闭后同日再次双击」因
-    // 值相等而无法重启效果。
-    LaunchedEffect(eventDialogRequest) {
+    // ── 事件编辑表单 ──
+    // 桌面：经 showOverlay 推送到 HomeScreen 全窗遮罩（暖色灯罩 + 居中弹窗）；
+    // 移动端（compact）：直接渲染 ModalBottomSheet（自带遮罩/安全区/IME 适配）。
+    if (compact) {
         val date = eventDialogDate
-        if (date != null && showOverlay != null) {
-            // Capture values NOW — the composable lambda outlives this coroutine
-            // and must not read mutable state that gets cleared on dismiss.
+        if (date != null) {
             val name = eventDialogName
             val color = eventDialogColor
             val pinned = eventDialogPinned
@@ -395,32 +393,78 @@ fun CalendarPanel(
                 eventDialogAllDay = false
                 eventDialogTimeMinutes = null
                 eventDialogExistingId = null
-                eventDialogRequest++  // 触发效果重启 → 走 else 分支收起遮罩
             }
-            showOverlay {
-                EventEditDialog(
-                    date = date,
-                    initialName = name,
-                    initialColor = color,
-                    initialPinned = pinned,
-                    existingEventId = existingId,
-                    onSave = { n, c, p, a, t ->
-                        existingId?.let { onDeleteEvent(it) }
-                        onAddEvent(n, date, c, p, a, t)
-                        dismiss()
-                    },
-                    onDelete = {
-                        existingId?.let { onDeleteEvent(it) }
-                        dismiss()
-                    },
-                    onDismiss = { dismiss() },
-                    showTime = compact,
-                    initialAllDay = allDay,
-                    initialTimeMinutes = timeMinutes,
-                )
+
+            EventEditSheet(
+                date = date,
+                initialName = name,
+                initialColor = color,
+                initialPinned = pinned,
+                existingEventId = existingId,
+                onSave = { n, c, p, a, t ->
+                    existingId?.let { onDeleteEvent(it) }
+                    onAddEvent(n, date, c, p, a, t)
+                    dismiss()
+                },
+                onDelete = {
+                    existingId?.let { onDeleteEvent(it) }
+                    dismiss()
+                },
+                onDismiss = { dismiss() },
+                initialAllDay = allDay,
+                initialTimeMinutes = timeMinutes,
+            )
+        }
+    } else {
+        // ── Push dialog content to parent via showOverlay ──
+        // 以请求序号为 key（而非日期值），避免「遮罩关闭后同日再次双击」因
+        // 值相等而无法重启效果。
+        LaunchedEffect(eventDialogRequest) {
+            val date = eventDialogDate
+            if (date != null && showOverlay != null) {
+                // Capture values NOW — the composable lambda outlives this coroutine
+                // and must not read mutable state that gets cleared on dismiss.
+                val name = eventDialogName
+                val color = eventDialogColor
+                val pinned = eventDialogPinned
+                val allDay = eventDialogAllDay
+                val timeMinutes = eventDialogTimeMinutes
+                val existingId = eventDialogExistingId
+
+                fun dismiss() {
+                    eventDialogDate = null
+                    eventDialogName = ""
+                    eventDialogColor = 0
+                    eventDialogPinned = false
+                    eventDialogAllDay = false
+                    eventDialogTimeMinutes = null
+                    eventDialogExistingId = null
+                    eventDialogRequest++  // 触发效果重启 → 走 else 分支收起遮罩
+                }
+                showOverlay {
+                    EventEditDialog(
+                        date = date,
+                        initialName = name,
+                        initialColor = color,
+                        initialPinned = pinned,
+                        existingEventId = existingId,
+                        onSave = { n, c, p, a, t ->
+                            existingId?.let { onDeleteEvent(it) }
+                            onAddEvent(n, date, c, p, a, t)
+                            dismiss()
+                        },
+                        onDelete = {
+                            existingId?.let { onDeleteEvent(it) }
+                            dismiss()
+                        },
+                        onDismiss = { dismiss() },
+                        initialAllDay = allDay,
+                        initialTimeMinutes = timeMinutes,
+                    )
+                }
+            } else {
+                hideOverlay?.invoke()
             }
-        } else {
-            hideOverlay?.invoke()
         }
     }
 }
