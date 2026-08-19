@@ -1,0 +1,420 @@
+# SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# 发布流水线（参考 magic-cucumber/Pixiv-MultiPlatform 的 per-platform build + create-release 结构）：
+# 打 v* 标签或手动 dispatch 触发。各平台 build job 只产出并上传最终分发物
+# （纯净编译产物：安装包 / 可运行 app 压缩包 / 签名 APK / IPA，不含任何中间产物），
+# 由 create-release 汇总 SHA256SUMS 并发布 GitHub Release。签名材料一律来自 GitHub Secrets。
+# iOS 工程由 XcodeGen 从 iosApp/project.yml 生成（生成的 shiromi.xcodeproj 不入库）。
+
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "发版版本号（手动触发时使用；标签触发时自动取标签名去 v）"
+        required: false
+        default: "0.1.0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 版本解析：tag 触发取标签名（去前导 v），手动触发取输入 ──
+  resolve-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve release version
+        id: resolve
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="${{ inputs.version }}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+  # ── Windows: exe + msi + 可运行 app zip ──
+  build-windows:
+    needs: resolve-version
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Windows packages (exe + msi)
+        env:
+          APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
+        run: ./gradlew :composeApp:releaseDesktop
+
+      - name: Stage release artifacts
+        shell: powershell
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = "shiromi-$env:VERSION-windows-x64"
+          New-Item -ItemType Directory -Force dist-windows | Out-Null
+          $exe = Get-ChildItem 'composeApp\build\compose\binaries\main\windows\exe' -Filter '*.exe' | Select-Object -First 1
+          $msi = Get-ChildItem 'composeApp\build\compose\binaries\main\windows\msi' -Filter '*.msi' | Select-Object -First 1
+          if (-not $exe -or -not $msi) { throw "exe/msi artifact not found" }
+          Move-Item $exe.FullName "dist-windows\$base.exe"
+          Move-Item $msi.FullName "dist-windows\$base.msi"
+          $app = Get-ChildItem 'composeApp\build\compose\binaries\main\app' -Directory | Select-Object -First 1
+          if (-not $app) { throw "app dir not found" }
+          Compress-Archive -Path $app.FullName -DestinationPath "dist-windows\$base.zip"
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist-windows
+          retention-days: 14
+
+  # ── Linux: deb + 可运行 app tar.gz（Compose 1.11 已弃用 AppImage，无产物）──
+  build-linux:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install native build dependencies (wvbridge platform-linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev cmake
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Linux package (deb)
+        env:
+          APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
+        run: ./gradlew :composeApp:releaseDesktop
+
+      - name: Stage release artifacts
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-linux
+          deb=$(find composeApp/build/compose/binaries/main/linux/deb -name '*.deb' | head -1)
+          [ -n "$deb" ] || { echo "deb not found"; exit 1; }
+          mv "$deb" "dist-linux/shiromi-$VERSION-linux-x64.deb"
+          app=$(find composeApp/build/compose/binaries/main/app -mindepth 1 -maxdepth 1 -type d | head -1)
+          [ -n "$app" ] || { echo "app dir not found"; exit 1; }
+          tar -czf "dist-linux/shiromi-$VERSION-linux-x64.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: dist-linux
+          retention-days: 14
+
+  # ── macOS: dmg ──
+  build-macos:
+    needs: resolve-version
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build macOS package (dmg)
+        env:
+          APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
+        run: ./gradlew :composeApp:releaseDesktop
+
+      - name: Stage release artifact
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-macos
+          dmg=$(find composeApp/build/compose/binaries/main/macos/dmg -name '*.dmg' | head -1)
+          [ -n "$dmg" ] || { echo "dmg not found"; exit 1; }
+          mv "$dmg" "dist-macos/shiromi-$VERSION-macos-$(uname -m).dmg"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist-macos
+          retention-days: 14
+
+  # ── Android: 签名 Release APK（Secrets 缺失时降级为未签名并告警）──
+  build-android:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Write Android signing config from secrets
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$HOME/.android/release.keystore"
+          cat > "$HOME/.android/keystore.properties" <<EOF
+          storeFile=release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Build Android release APKs
+        env:
+          APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
+        run: ./gradlew :composeApp:releaseAndroid
+
+      - name: Verify APK signatures
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        run: |
+          set -euo pipefail
+          bt=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
+          for apk in composeApp/build/outputs/apk/release/*.apk; do
+            "$ANDROID_HOME/build-tools/$bt/apksigner" verify --print-certs "$apk" | grep -q 'Signer #1'
+            echo "signed OK: $apk"
+          done
+
+      - name: Stage release artifacts
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-android
+          cd composeApp/build/outputs/apk/release
+          for apk in *.apk; do
+            case "$apk" in
+              *arm64-v8a*) mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-arm64-v8a.apk" ;;
+              *x86_64*)    mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-x86_64.apk" ;;
+              *universal*) mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-universal.apk" ;;
+              *) echo "unexpected apk: $apk"; exit 1 ;;
+            esac
+          done
+
+      - name: Upload Android APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist-android
+          retention-days: 14
+
+  # ── iOS: 免签名模拟器 .app（始终构建）+ 签名 .ipa（Secrets 齐全时）──
+  build-ios:
+    needs: resolve-version
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+      IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+      IOS_PROVISIONING_PROFILE_SPECIFIER: ${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}
+      IOS_EXPORT_METHOD: ${{ secrets.IOS_EXPORT_METHOD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install XcodeGen and generate Xcode project
+        run: |
+          brew install xcodegen
+          cd iosApp && xcodegen generate
+
+      - name: Build unsigned iOS simulator app
+        run: |
+          xcodebuild -project iosApp/shiromi.xcodeproj -scheme shiromi \
+            -configuration Release -sdk iphonesimulator \
+            -derivedDataPath composeApp/build/ios-simulator \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Package simulator app
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-ios-sim
+          APP="composeApp/build/ios-simulator/Build/Products/Release-iphonesimulator/shiromi.app"
+          [ -d "$APP" ] || { echo "simulator app not found: $APP"; exit 1; }
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "dist-ios-sim/shiromi-$VERSION-ios-simulator.app.zip"
+
+      - name: Import signing certificate into keychain
+        if: env.IOS_CERTIFICATE_BASE64 != ''
+        run: |
+          set -euo pipefail
+          echo "$IOS_CERTIFICATE_BASE64" | base64 -D > "$RUNNER_TEMP/cert.p12"
+          KEYCHAIN="$RUNNER_TEMP/shiromi.keychain"
+          security create-keychain -p "$RUNNER_TEMP/kc-pass" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$RUNNER_TEMP/kc-pass" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$IOS_CERTIFICATE_PASSWORD" -A -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$RUNNER_TEMP/kc-pass" "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
+
+      - name: Install provisioning profile
+        if: env.IOS_CERTIFICATE_BASE64 != ''
+        run: |
+          set -euo pipefail
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -D > "$RUNNER_TEMP/profile.mobileprovision"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          UUID=$(grep -a -A1 '<key>UUID</key>' "$RUNNER_TEMP/profile.mobileprovision" | grep -oaE '[-A-Z0-9]{36}' | head -1)
+          [ -n "$UUID" ] || { echo "failed to extract provisioning profile UUID"; exit 1; }
+          echo "PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+
+      - name: Archive signed iOS app
+        if: env.IOS_CERTIFICATE_BASE64 != ''
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          xcodebuild -project iosApp/shiromi.xcodeproj -scheme shiromi \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/shiromi.xcarchive" archive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROVISIONING_PROFILE_SPECIFIER" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$(echo "$VERSION" | tr -cd '0-9' | head -c 9)"
+
+      - name: Export IPA
+        if: env.IOS_CERTIFICATE_BASE64 != ''
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          method="${IOS_EXPORT_METHOD:-app-store-connect}"
+          mkdir -p dist-ios
+          cat > "$RUNNER_TEMP/exportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>$method</string>
+            <key>teamID</key>
+            <string>$IOS_TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/shiromi.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/exportOptions.plist"
+          mv "$RUNNER_TEMP/export/shiromi.ipa" "dist-ios/shiromi-$VERSION-ios.ipa"
+
+      - name: Upload iOS simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-sim
+          path: dist-ios-sim
+          retention-days: 14
+
+      - name: Upload iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: dist-ios
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ── 汇总发布：下载全部产物 → 校验和 → 创建 GitHub Release ──
+  create-release:
+    needs: [resolve-version, build-windows, build-linux, build-macos, build-android, build-ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: List release assets
+        run: find dist -type f | sort
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum $(find . -type f | sort) > SHA256SUMS.txt
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.resolve-version.outputs.version }}
+          name: v${{ needs.resolve-version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/windows-x64/*
+            dist/linux-x64/*
+            dist/macos/*
+            dist/android/*
+            dist/ios-sim/*
+            dist/ios-ipa/*
+            dist/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

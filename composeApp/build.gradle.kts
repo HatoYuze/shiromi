@@ -7,6 +7,11 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 val prop = { key: String -> (project.findProperty(key) as String?) ?: "" }
 
+// CI 发版版本：优先 APP_VERSION_NAME 环境变量（由 .github/workflows/publish-release.yml 注入 tag 版本），
+// 其次 -Pversion=<ver>；缺省 0.1.0。versionCode 同理（APP_VERSION_CODE / -PversionCode，缺省 1）。
+val releaseVersion: String = (System.getenv("APP_VERSION_NAME") ?: prop("version")).removePrefix("v").ifBlank { "0.1.0" }
+val releaseVersionCode: Int = (System.getenv("APP_VERSION_CODE") ?: prop("versionCode")).toIntOrNull() ?: 1
+
 // 本机 Android release 签名配置：读取 ~/.android/keystore.properties（不入仓库，仓库保持可移植）。
 // 文件缺失时 release 产物保持 unsigned 并给出 apksigner 手动签名提示；文件损坏时降级为 unsigned 并告警，
 // 不因本机签名配置问题拖垮桌面/iOS 等其他构建任务。
@@ -253,8 +258,8 @@ android {
         applicationId = "com.github.hatoyuze.shiromi"
         minSdk = prop("MIN_SDK").toInt()
         targetSdk = prop("TARGET_SDK").toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersion
     }
 
     if (androidKeystoreProps != null) {
@@ -331,7 +336,7 @@ compose.desktop {
                 else -> error("Unsupported distribution target: $distTarget")
             }
             packageName = "shiromi"
-            packageVersion = "0.1.0"
+            packageVersion = releaseVersion
 
             if (distTarget == "windows") {
                 windows {
