@@ -33,6 +33,7 @@ targets:
             exit 0
           fi
           cd "$SRCROOT/.."
+          chmod +x ./gradlew
           ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode
     settings:
       base:

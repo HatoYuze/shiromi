@@ -8,9 +8,11 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 val prop = { key: String -> (project.findProperty(key) as String?) ?: "" }
 
 // CI 发版版本：优先 APP_VERSION_NAME 环境变量（由 .github/workflows/publish-release.yml 注入 tag 版本），
-// 其次 -Pversion=<ver>；缺省 0.1.0。versionCode 同理（APP_VERSION_CODE / -PversionCode，缺省 1）。
-val releaseVersion: String = (System.getenv("APP_VERSION_NAME") ?: prop("version")).removePrefix("v").ifBlank { "0.1.0" }
-val releaseVersionCode: Int = (System.getenv("APP_VERSION_CODE") ?: prop("versionCode")).toIntOrNull() ?: 1
+// 其次 -PappVersion=<ver>；缺省 0.1.0。versionCode 同理（APP_VERSION_CODE / -PappVersionCode，缺省 1）。
+// 注意：回退属性不能叫 version——那是 Gradle 内置项目属性（未设置时恒为 "unspecified"），
+// 会导致 Compose 桌面打包的 deb 版本校验失败（Illegal version for 'Deb'）。
+val releaseVersion: String = (System.getenv("APP_VERSION_NAME") ?: prop("appVersion")).removePrefix("v").ifBlank { "0.1.0" }
+val releaseVersionCode: Int = (System.getenv("APP_VERSION_CODE") ?: prop("appVersionCode")).toIntOrNull() ?: 1
 
 // 本机 Android release 签名配置：读取 ~/.android/keystore.properties（不入仓库，仓库保持可移植）。
 // 文件缺失时 release 产物保持 unsigned 并给出 apksigner 手动签名提示；文件损坏时降级为 unsigned 并告警，

@@ -116,7 +116,9 @@ jobs:
       - name: Build Linux package (deb)
         env:
           APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
-        run: ./gradlew :composeApp:releaseDesktop
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :composeApp:releaseDesktop
 
       - name: Stage release artifacts
         env:
@@ -158,7 +160,9 @@ jobs:
       - name: Build macOS package (dmg)
         env:
           APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
-        run: ./gradlew :composeApp:releaseDesktop
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :composeApp:releaseDesktop
 
       - name: Stage release artifact
         env:
@@ -215,7 +219,9 @@ jobs:
       - name: Build Android release APKs
         env:
           APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
-        run: ./gradlew :composeApp:releaseAndroid
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :composeApp:releaseAndroid
 
       - name: Verify APK signatures
         if: env.ANDROID_KEYSTORE_BASE64 != ''

@@ -34,7 +34,9 @@ jobs:
         # wvbridge core 在非 macOS 主机上用 iOS API 桩（src/iosStubMain）产出 iOS klib，
         # Linux 可直接交叉编译 composeApp 的 iOS 平台；真实 iOS framework 链接仍需 macOS，
         # 由下方独立的 ios-build 任务负责。
-        run: ./gradlew build
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build
 
   ios-build:
 
@@ -56,23 +58,6 @@ jobs:
 
       - name: Compile iOS targets (cinterop requires macOS host)
         run: |
+          chmod +x ./gradlew
           ./gradlew :composeApp:compileKotlinIosArm64 :composeApp:compileKotlinIosSimulatorArm64 \
             :composeApp:linkDebugFrameworkIosArm64 :composeApp:linkDebugFrameworkIosSimulatorArm64
-
-  dependency-submission:
-
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Generate and submit dependency graph
-        uses: gradle/actions/dependency-submission@v4
