@@ -4,8 +4,8 @@ shiromi is a Compose Multiplatform desktop client for Luogu AI assistance, built
 
 ## Project Structure & Module Organization
 
-- `composeApp/`: the Compose Multiplatform desktop client — the main body of the project. Shared UI/domain code lives in `src/commonMain/kotlin/com/github/hatoyuze/luogu/gui/`, JVM entry point and platform actuals in `src/jvmMain`.
-- `lib/luogu-protocol/`: the Luogu protocol library — Luogu API client and models (`skill/api`), caching (`skill/cache`), platform resources (`skill/platform`, incl. `luogu_tags.json`), and the coach domain layer (`skill/coach`). No CLI code lives here.
+- `composeApp/`: the Compose Multiplatform desktop client — the main body of the project. Shared UI/domain code lives in `src/commonMain/kotlin/com/github/hatoyuze/shiromi/gui/`, JVM entry point and platform actuals in `src/jvmMain`.
+- `lib/luogu-protocol/`: the Luogu protocol library — Luogu API client and models (`protocol/api`), caching (`protocol/cache`), platform resources (`protocol/platform`, incl. `luogu_tags.json`), and the coach domain layer (`protocol/coach`). No CLI code lives here.
 - DeepSeek chat, tool DSL, and pipeline come from `io.github.hatoyuze:deepseek-helper` (Maven Central; see `gradle/libs.versions.toml`).
 - Runtime user data (config TOML with credentials, `chat.db`, image cache) is stored under `~/.luogu-gui/`; never commit real values.
 

@@ -10,10 +10,10 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.github.hatoyuze.luogu.gui.App
-import com.github.hatoyuze.luogu.gui.config.GuiConfigLoader
-import com.github.hatoyuze.luogu.gui.di.AppBootstrap
-import com.github.hatoyuze.luogu.gui.platform.AppContextHolder
+import com.github.hatoyuze.shiromi.gui.App
+import com.github.hatoyuze.shiromi.gui.config.GuiConfigLoader
+import com.github.hatoyuze.shiromi.gui.di.AppBootstrap
+import com.github.hatoyuze.shiromi.gui.platform.AppContextHolder
 
 /**
  * Android 入口：先初始化平台上下文与全局引导（配置加载、日志、数据库），

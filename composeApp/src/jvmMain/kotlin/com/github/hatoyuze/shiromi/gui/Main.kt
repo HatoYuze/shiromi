@@ -1,0 +1,23 @@
+// SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package com.github.hatoyuze.shiromi.gui
+
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import com.github.hatoyuze.shiromi.gui.config.GuiConfigLoader
+import com.github.hatoyuze.shiromi.gui.di.AppBootstrap
+
+fun main() = application {
+    val databaseWrapper = AppBootstrap(GuiConfigLoader()).initialize()
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "Shiromi",
+        state = rememberWindowState(width = 1500.dp, height = 920.dp),
+    ) {
+        App(databaseWrapper)
+    }
+}

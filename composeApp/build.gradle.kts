@@ -321,7 +321,7 @@ android {
 
 compose.desktop {
     application {
-        mainClass = "com.github.hatoyuze.luogu.gui.MainKt"
+        mainClass = "com.github.hatoyuze.shiromi.gui.MainKt"
 
         nativeDistributions {
             // 每个分发目标对应不同的安装包格式（Exe/Msi / Deb/AppImage / Dmg）
@@ -352,7 +352,7 @@ compose.desktop {
 sqldelight {
     databases {
         create("LuoguDatabase") {
-            packageName.set("com.github.hatoyuze.luogu.gui")
+            packageName.set("com.github.hatoyuze.shiromi.gui")
         }
     }
 }

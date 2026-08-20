@@ -53,7 +53,7 @@ kotlin {
 }
 
 android {
-    namespace = "com.github.hatoyuze.luogu.protocol"
+    namespace = "com.github.hatoyuze.shiromi.protocol"
     compileSdk = prop("COMPILE_SDK").toInt()
 
     defaultConfig {
