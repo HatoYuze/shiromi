@@ -34,7 +34,16 @@ API_EXPORT(jstring, getCookieString, jlong handle, jstring url) {
         }
 
         Microsoft::WRL::ComPtr<ICoreWebView2CookieManager> cookieManager;
-        HRESULT hr = ctx->webview->get_CookieManager(&cookieManager);
+        // get_CookieManager lives on the versioned ICoreWebView2_2 interface, not the base
+        // ICoreWebView2 (SDK 1.0.3595.46 headers); QueryInterface before calling it.
+        Microsoft::WRL::ComPtr<ICoreWebView2_2> webview2;
+        HRESULT hr = ctx->webview.As(&webview2);
+        if (FAILED(hr)) {
+            LOGGER_V("getCookieString: QueryInterface ICoreWebView2_2 failed, hr=0x%lx", (unsigned long)hr);
+            completion->set_value(Result{hr, ""});
+            return;
+        }
+        hr = webview2->get_CookieManager(&cookieManager);
         if (FAILED(hr)) {
             LOGGER_V("getCookieString: get_CookieManager failed, hr=0x%lx", (unsigned long)hr);
             completion->set_value(Result{hr, ""});
@@ -44,7 +53,7 @@ API_EXPORT(jstring, getCookieString, jlong handle, jstring url) {
         auto callback = Callback<ICoreWebView2GetCookiesCompletedHandler>(
             [completion](HRESULT errorCode, ICoreWebView2CookieList *cookieList) -> HRESULT {
                 if (FAILED(errorCode)) {
-                    LOGGER_V("getCookieString: GetCookiesAsync callback error hr=0x%lx", (unsigned long)errorCode);
+                    LOGGER_V("getCookieString: GetCookies callback error hr=0x%lx", (unsigned long)errorCode);
                     completion->set_value(Result{errorCode, ""});
                     return S_OK;
                 }
@@ -79,17 +88,17 @@ API_EXPORT(jstring, getCookieString, jlong handle, jstring url) {
             }
         );
 
-        hr = cookieManager->GetCookiesAsync(wurl.c_str(), callback.Get());
+        hr = cookieManager->GetCookies(wurl.c_str(), callback.Get());
         if (FAILED(hr)) {
-            LOGGER_V("getCookieString: GetCookiesAsync failed, hr=0x%lx", (unsigned long)hr);
+            LOGGER_V("getCookieString: GetCookies failed, hr=0x%lx", (unsigned long)hr);
             completion->set_value(Result{hr, ""});
         }
     });
 
     Result result = future.get();
     if (FAILED(result.hr)) {
-        LOGGER_E("getCookieString: GetCookiesAsync failed, hr=0x%lx", (unsigned long)result.hr);
-        throw_hresult(env, "GetCookiesAsync", result.hr);
+        LOGGER_E("getCookieString: GetCookies failed, hr=0x%lx", (unsigned long)result.hr);
+        throw_hresult(env, "GetCookies", result.hr);
         return nullptr;
     }
     LOGGER_V("getCookieString: returning cookie string length=%zu", result.value.size());

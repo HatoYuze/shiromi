@@ -14,6 +14,10 @@ val prop = { key: String -> (project.findProperty(key) as String?) ?: "" }
 val releaseVersion: String = (System.getenv("APP_VERSION_NAME") ?: prop("appVersion")).removePrefix("v").ifBlank { "0.1.0" }
 val releaseVersionCode: Int = (System.getenv("APP_VERSION_CODE") ?: prop("appVersionCode")).toIntOrNull() ?: 1
 
+// 桌面打包版本：Windows Exe/Msi 要求 MAJOR.MINOR.BUILD、macOS Dmg 要求 MAJOR[.MINOR][.PATCH]（纯数字），
+// 预发布后缀（如 0.1.0-beta.1）会被 Compose 插件校验拒绝，故剥掉后缀；Android versionName 保留完整版本。
+val desktopPackageVersion: String = releaseVersion.substringBefore('-').ifBlank { releaseVersion }
+
 // 本机 Android release 签名配置：读取 ~/.android/keystore.properties（不入仓库，仓库保持可移植）。
 // 文件缺失时 release 产物保持 unsigned 并给出 apksigner 手动签名提示；文件损坏时降级为 unsigned 并告警，
 // 不因本机签名配置问题拖垮桌面/iOS 等其他构建任务。
@@ -338,7 +342,7 @@ compose.desktop {
                 else -> error("Unsupported distribution target: $distTarget")
             }
             packageName = "shiromi"
-            packageVersion = releaseVersion
+            packageVersion = desktopPackageVersion
 
             if (distTarget == "windows") {
                 windows {

@@ -67,6 +67,16 @@ jobs:
           APP_VERSION_NAME: ${{ needs.resolve-version.outputs.version }}
         run: ./gradlew :composeApp:releaseDesktop
 
+      - name: Dump packaging logs (diagnostic)
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          for f in composeApp/build/compose/logs/createDistributable/*.txt; do
+            [ -f "$f" ] && { echo "===== $f ====="; cat "$f"; }
+          done
+          exit 0
+
       - name: Stage release artifacts
         shell: powershell
         env:
@@ -75,8 +85,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $base = "shiromi-$env:VERSION-windows-x64"
           New-Item -ItemType Directory -Force dist-windows | Out-Null
-          $exe = Get-ChildItem 'composeApp\build\compose\binaries\main\windows\exe' -Filter '*.exe' | Select-Object -First 1
-          $msi = Get-ChildItem 'composeApp\build\compose\binaries\main\windows\msi' -Filter '*.msi' | Select-Object -First 1
+          $exe = Get-ChildItem 'composeApp\build\compose\binaries\main\exe' -Filter '*.exe' | Select-Object -First 1
+          $msi = Get-ChildItem 'composeApp\build\compose\binaries\main\msi' -Filter '*.msi' | Select-Object -First 1
           if (-not $exe -or -not $msi) { throw "exe/msi artifact not found" }
           Move-Item $exe.FullName "dist-windows\$base.exe"
           Move-Item $msi.FullName "dist-windows\$base.msi"
@@ -120,13 +130,22 @@ jobs:
           chmod +x ./gradlew
           ./gradlew :composeApp:releaseDesktop
 
+      - name: Dump packaging logs (diagnostic)
+        if: failure()
+        run: |
+          set +e
+          for f in composeApp/build/compose/logs/createDistributable/*.txt; do
+            [ -f "$f" ] && { echo "===== $f ====="; cat "$f"; }
+          done
+          exit 0
+
       - name: Stage release artifacts
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p dist-linux
-          deb=$(find composeApp/build/compose/binaries/main/linux/deb -name '*.deb' | head -1)
+          deb=$(find composeApp/build/compose/binaries/main/deb -name '*.deb' | head -1)
           [ -n "$deb" ] || { echo "deb not found"; exit 1; }
           mv "$deb" "dist-linux/shiromi-$VERSION-linux-x64.deb"
           app=$(find composeApp/build/compose/binaries/main/app -mindepth 1 -maxdepth 1 -type d | head -1)
@@ -164,13 +183,22 @@ jobs:
           chmod +x ./gradlew
           ./gradlew :composeApp:releaseDesktop
 
+      - name: Dump packaging logs (diagnostic)
+        if: failure()
+        run: |
+          set +e
+          for f in composeApp/build/compose/logs/createDistributable/*.txt; do
+            [ -f "$f" ] && { echo "===== $f ====="; cat "$f"; }
+          done
+          exit 0
+
       - name: Stage release artifact
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p dist-macos
-          dmg=$(find composeApp/build/compose/binaries/main/macos/dmg -name '*.dmg' | head -1)
+          dmg=$(find composeApp/build/compose/binaries/main/dmg -name '*.dmg' | head -1)
           [ -n "$dmg" ] || { echo "dmg not found"; exit 1; }
           mv "$dmg" "dist-macos/shiromi-$VERSION-macos-$(uname -m).dmg"
 
@@ -340,7 +368,7 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$IOS_PROVISIONING_PROFILE_SPECIFIER" \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
-            MARKETING_VERSION="$VERSION" \
+            MARKETING_VERSION="${VERSION%%-*}" \
             CURRENT_PROJECT_VERSION="$(echo "$VERSION" | tr -cd '0-9' | head -c 9)"
 
       - name: Export IPA
