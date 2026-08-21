@@ -95,9 +95,6 @@ import com.github.hatoyuze.shiromi.gui.presentation.components.PulsatingDot
 import com.github.hatoyuze.shiromi.gui.presentation.components.RightSideSheet
 import com.github.hatoyuze.shiromi.gui.presentation.components.ThinkingIndicator
 import com.github.hatoyuze.shiromi.gui.presentation.components.icons.AppIcons
-
-import com.github.hatoyuze.shiromi.gui.presentation.modifier.animatedBorder
-
 import com.github.hatoyuze.shiromi.gui.presentation.state.ChatEvent
 import com.github.hatoyuze.shiromi.gui.presentation.state.ChatUiState
 import com.github.hatoyuze.shiromi.gui.presentation.state.ChatViewModel
@@ -578,16 +575,9 @@ fun ChatInput(
 
         Row(
             modifier = Modifier.then(
-                if (isFocused) Modifier.animatedBorder(
-                    borderColors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.secondary,
-                        MaterialTheme.colorScheme.tertiary
-                    ),
-                    shape = RoundedCornerShape(24.dp),
-                    backgroundColor = MaterialTheme.colorScheme.surface,
-                    borderWidth = 2.dp
-                ) else Modifier
+                // 移除聚焦时的 animatedBorder 旋转渐变边框（用户反馈干扰视线）；
+                // 聚焦态只保留静态 borderColor 描边（Surface border 已按焦点变色）。
+                Modifier
             )
                 .wrapContentHeight(),
             verticalAlignment = Alignment.CenterVertically

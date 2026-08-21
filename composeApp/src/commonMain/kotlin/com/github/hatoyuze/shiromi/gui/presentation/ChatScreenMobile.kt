@@ -18,19 +18,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.shiromi.gui.domain.model.ChatMessageDomainModel
 import com.github.hatoyuze.shiromi.gui.domain.model.SessionType
+import com.github.hatoyuze.shiromi.gui.platform.ImeMotionInsetObserver
+import com.github.hatoyuze.shiromi.gui.platform.imeMotionPxState
 import com.github.hatoyuze.shiromi.gui.presentation.components.askuser.AskUserCard
 import com.github.hatoyuze.shiromi.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.shiromi.gui.presentation.state.ChatEvent
 import com.github.hatoyuze.shiromi.gui.presentation.state.ChatUiState
 import com.github.hatoyuze.shiromi.gui.theme.LocalThemeIsDark
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.ArrowDown
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.BookOpen
 import compose.icons.feathericons.Check
@@ -230,6 +233,62 @@ internal fun MobileChatScreen(
             onEvent = onEvent,
             onDismiss = { showSessionSheet = false },
         )
+    }
+}
+
+/**
+ * 移动端输入区：IME 偏移用 [smoothImePadding]。
+ *
+ * 实测：dock 态 raw 平滑单调，HEAD 裸 imePadding 展开无冲高；float 态 raw 会瞬间
+ * 冲高后平台约 500ms，与可见键盘脱节。[smoothImePadding] 按形态选轨迹（见 ImeMotion）。
+ * [WindowInsets.ime] 读取与动画状态都限定在本小 Composable 内——键盘动画帧只重组
+ * 输入区，不波及整个聊天页。
+ */
+@Composable
+private fun ChatInputArea(
+    onSendMessage: (String) -> Unit,
+    enabled: Boolean,
+) {
+    ChatInput(
+        onSendMessage = onSendMessage,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .smoothImePadding(),
+        compact = true,
+    )
+}
+
+/**
+ * 平滑 IME 底部 inset（替代裸 `imePadding()`）。
+ *
+ * 状态感知（见 [ImeMotion] 顶层文档，两轮 logcat + 两轮录屏收敛）：
+ * - dock：`min(raw, dockTarget)`——raw 可信时逐帧跟随（与 HEAD 裸 imePadding 一致），
+ *   冲高被 target 封顶；
+ * - float：沿实测可见键盘曲线独立升起（约 540ms），忽略 raw 的 spike/plateau；
+ * - 收起：`emitted = raw`（保持已实证行为）。
+ *
+ * 逐帧信号源：组合内 [ImeMotionInsetObserver]（本机 decor 监听器只收稳定跳变）；
+ * 观察者内置帧时钟，raw 恒定期间继续补帧完成稳定学习。输出值在**布局阶段**读取
+ * （`Modifier.layout`）——键盘动画逐帧变化只触发重排，不重组输入区。
+ */
+@Composable
+internal fun Modifier.smoothImePadding(): Modifier {
+    // 逐帧驱动引擎（独立小组合，仅自身重组）
+    ImeMotionInsetObserver()
+    return layout { measurable, constraints ->
+        val bottomPx = imeMotionPxState.value
+        // 与 padding(bottom) 语义一致：内容按「可用高度 - 偏移」测量，偏移空间加在下方
+        val childConstraints = if (bottomPx > 0 && constraints.hasBoundedHeight) {
+            constraints.copy(maxHeight = (constraints.maxHeight - bottomPx).coerceAtLeast(0))
+        } else {
+            constraints
+        }
+        val placeable = measurable.measure(childConstraints)
+        layout(placeable.width, placeable.height + bottomPx) {
+            placeable.placeRelative(0, 0)
+        }
     }
 }
 

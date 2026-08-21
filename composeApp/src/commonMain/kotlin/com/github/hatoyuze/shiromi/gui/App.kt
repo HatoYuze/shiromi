@@ -4,8 +4,11 @@
 
 package com.github.hatoyuze.shiromi.gui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
@@ -109,10 +112,32 @@ private fun DesktopNav() {
 private enum class MobileDest { HOME, CHAT, SETTINGS }
 
 /**
- * 键盘“可见”判定阈值：IME inset 高于该值才隐藏底部导航栏，低于则视为键盘已收起，
- * 避免键盘动画收尾阶段底栏闪跳。与 [OnboardingScreen] 共用（同一策略）。
+ * 底栏隐藏状态：hide 与 show 都用 8dp（与 HEAD 一致）。键盘升起时底栏立即消失，
+ * 键盘收起时底栏带 enter 动画恢复。IME inset 读取是 @Composable 的（CMP 1.11），
+ * 限定在本小 Composable 内，键盘动画帧只重组这里，不波及 MobileNav。
+ */
+@Composable
+private fun rememberImeNavHidden(): Boolean {
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    var hidden by remember { mutableStateOf(false) }
+    LaunchedEffect(imeBottom) {
+        val hidePx = with(density) { imeShowThresholdDp.toPx() }
+        val showPx = with(density) { imeHideThresholdDp.toPx() }
+        if (imeBottom > hidePx) hidden = true
+        else if (imeBottom <= showPx) hidden = false
+    }
+    return hidden
+}
+
+/**
+ * 键盘“可见”判定阈值：IME inset ≤ 该值才恢复显示底部导航栏（与 HEAD 一致）。
+ * 与 [OnboardingScreen] 共用（同一策略）。
  */
 internal val imeHideThresholdDp = 8.dp
+
+/** 键盘“明显升起”阈值：IME inset > 该值立即隐藏底部导航栏（与 HEAD 一致）。 */
+internal val imeShowThresholdDp = 8.dp
 
 @Composable
 private fun MobileNav() {
@@ -123,17 +148,23 @@ private fun MobileNav() {
     // IME 可见时隐藏底部导航栏：底栏位于输入框与窗口底边之间（内容列始终结束于
     // 底栏之上），键盘弹出时 imePadding 会把输入框抬得过高，留下约一个底栏高度的
     // 空档。隐藏后内容可延伸至窗口底边，输入框经各输入面自己的 imePadding 恰好
-    // 落在键盘顶边。读取 insets 触发重组与 imePadding 同一机制，动画帧内重组成本
-    // 有限（子节点参数稳定时被 strong-skipping 跳过）。
-    val density = LocalDensity.current
-    val imeHideThresholdPx = with(density) { imeHideThresholdDp.toPx() }
-    val imeVisible = WindowInsets.ime.getBottom(density) > imeHideThresholdPx
+    // 落在键盘顶边。
+    // 底栏隐藏状态独立小作用域管理：IME inset 读取（@Composable）与滞回判定只重组
+    // rememberImeNavHidden 自身，键盘动画帧不波及 MobileNav；MobileNav 仅在
+    // hidden 翻转（每轮键盘最多两次）时重组。
+    val imeNavHidden = rememberImeNavHidden()
 
     // contentWindowInsets 只取顶部状态栏：底部系统栏 inset 在底栏可见时由其自身
     // 处理，在底栏因 IME 隐藏时被键盘覆盖，避免输入区被系统栏/IME 重复抬高。
     Scaffold(
         bottomBar = {
-            if (!imeVisible) {
+            // 方向敏感：键盘升起时 exit=None 立即隐藏（与 HEAD 一致，避免 Scaffold
+            // 高度动画与 IME 上升叠加）；键盘收起时 enter 滑入保留丝滑恢复。
+            AnimatedVisibility(
+                visible = !imeNavHidden,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+                exit = ExitTransition.None,
+            ) {
                 NavigationBar {
                     NavigationBarItem(
                         selected = dest == MobileDest.HOME,
