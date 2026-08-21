@@ -41,6 +41,7 @@ import compose.icons.feathericons.MessageSquare
 import compose.icons.feathericons.Moon
 import compose.icons.feathericons.MoreVertical
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 手机端（Compact）对话页。
@@ -63,6 +64,8 @@ internal fun MobileChatScreen(
     var showSessionSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val pending = uiState.pendingAskUser
+    // 贴底跟随状态（由 ChatMessages 的控制器回调更新）：上翻阅读后显示「回到底部」
+    var autoScrollPinned by remember { mutableStateOf(true) }
 
     // 根 Column 不再加 navigationBarsPadding：MobileNav 的 Scaffold 已计入
     // 底部导航栏高度 + 顶部状态栏 inset，避免输入区被双重抬高；IME 可见时
@@ -117,7 +120,33 @@ internal fun MobileChatScreen(
                 alwaysShowActions = true,
                 compact = true,
                 onOpenProblem = onOpenProblem,
+                onPinnedChange = { autoScrollPinned = it },
             )
+
+            // 用户上翻阅读后显示「回到底部」；点击平滑回到最新消息（到达后控制器自动恢复贴底）
+            if (!autoScrollPinned) {
+                val scope = rememberCoroutineScope()
+                FloatingActionButton(
+                    onClick = {
+                        scope.launch {
+                            val count = listState.layoutInfo.totalItemsCount
+                            if (count > 0) listState.animateScrollToItem(count - 1, Int.MAX_VALUE)
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = 8.dp)
+                        .size(44.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Icon(
+                        FeatherIcons.ArrowDown,
+                        contentDescription = "回到底部",
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
         }
 
         // ── TODO 横向滚动条 ──
@@ -216,13 +245,9 @@ internal fun MobileChatScreen(
         }
 
         // ── 输入区（发送只走按钮）──
-        // imePadding 是输入框唯一的 IME 偏移来源（Scaffold 只取顶部状态栏、
-        // IME 可见时隐藏底部导航栏），键盘弹出时输入框恰好落在键盘顶边一次
-        ChatInput(
+        ChatInputArea(
             onSendMessage = { onEvent(ChatEvent.SendMessage(it)) },
             enabled = !uiState.isLoading && (pending == null || pending.answer == null),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).imePadding(),
-            compact = true,
         )
     }
 

@@ -4,45 +4,15 @@
 
 package com.github.hatoyuze.shiromi.gui.presentation.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -50,14 +20,12 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.shiromi.gui.domain.model.ChatMessageDomainModel
@@ -74,18 +42,14 @@ import com.github.hatoyuze.shiromi.gui.presentation.components.coach.ProblemCard
 import com.github.hatoyuze.shiromi.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.shiromi.gui.presentation.markdown.FoldableFlavourDescriptor
 import com.github.hatoyuze.shiromi.gui.presentation.rememberMarkdownTypography
-import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
-import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
-import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.BookOpen
-import compose.icons.feathericons.Check
 import compose.icons.feathericons.CheckCircle
 import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.Clipboard
@@ -94,7 +58,6 @@ import compose.icons.feathericons.Cpu
 import compose.icons.feathericons.FileText
 import compose.icons.feathericons.Filter
 import compose.icons.feathericons.List
-import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Search
 
 
@@ -529,6 +492,9 @@ private fun ThinkingTimeline(
  *   滚动到边缘时经 nested scroll 交还外层 LazyColumn，解决「展开后无法下滑」；
  * - 流式时若用户停留在内滚底部则自动贴底跟随最新思考，上翻阅读则暂停跟随。
  */
+/** 时间线内滚跟随容差（px）：「上翻」= 值显著减小超过该值。 */
+private const val TIMELINE_FOLLOW_TOLERANCE_PX = 24f
+
 @Composable
 private fun ThinkingTimelineBody(
     items: List<MessageSegment>,
@@ -542,20 +508,26 @@ private fun ThinkingTimelineBody(
         with(density) { (windowInfo.containerSize.height * 0.4f).toDp() }.coerceIn(160.dp, 480.dp)
     }
 
-    // 内滚跟随（单一协程，无跨协程竞态）：流式时若用户停留在底部附近则自动贴底，
-    // 上翻阅读则暂停；内容增长（maxValue 变化）也会在同一收集器内重新判定并贴底。
-    // 「上翻」= 值显著减小（>24px）；「回到底部」= 值回到 max-24 内。
+    // 内滚跟随（与主列表同一模式）：观察器只更新 follow 标志（不滚动），
+    // 滚动由内容增长（maxValue 变化）触发；用户上翻阅读即暂停，回到底部自动恢复。
+    // 「上翻」= 值显著减小（>容差）；「回到底部」= 值回到 max-容差 内。
+    val follow = remember { mutableStateOf(true) }
+    var lastValue by remember { mutableStateOf(0) }
     LaunchedEffect(innerScroll, isStreaming) {
         if (!isStreaming) return@LaunchedEffect
-        var follow = true
-        var lastValue = 0
         snapshotFlow { innerScroll.value to innerScroll.maxValue }
             .collect { (value, max) ->
-                if (value < lastValue - 24f) follow = false
-                else if (value >= max - 24f) follow = true
+                if (value < lastValue - TIMELINE_FOLLOW_TOLERANCE_PX) follow.value = false
+                else if (value >= max - TIMELINE_FOLLOW_TOLERANCE_PX) follow.value = true
                 lastValue = value
-                if (follow && value < max) innerScroll.scrollTo(max)
             }
+    }
+    // 内容增长 → 贴底则贴尾（滚动只在内容增长时发生，用户滚动不触发；
+    // isScrollInProgress 守卫避免与用户拖动抢滚动）
+    LaunchedEffect(innerScroll.maxValue, isStreaming) {
+        if (isStreaming && follow.value && !innerScroll.isScrollInProgress && innerScroll.maxValue > 0) {
+            innerScroll.scrollTo(innerScroll.maxValue)
+        }
     }
 
     Box(

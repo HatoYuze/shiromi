@@ -4,69 +4,31 @@
 
 package com.github.hatoyuze.shiromi.gui.presentation
 
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.Typography
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.AnnotatedString
-import com.github.hatoyuze.shiromi.gui.platform.copyTextToClipboard
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -74,26 +36,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-
 import com.github.hatoyuze.shiromi.gui.domain.model.ChatBranchDomainModel
 import com.github.hatoyuze.shiromi.gui.domain.model.ChatMessageDomainModel
-import com.github.hatoyuze.shiromi.gui.domain.model.MessageSegment
 import com.github.hatoyuze.shiromi.gui.domain.model.MessageStatus
+import com.github.hatoyuze.shiromi.gui.platform.copyTextToClipboard
 import com.github.hatoyuze.shiromi.gui.presentation.adaptive.PlatformSizeClass
 import com.github.hatoyuze.shiromi.gui.presentation.adaptive.calculatePlatformSizeClass
-import com.github.hatoyuze.shiromi.gui.presentation.components.AnimatedBorderBox
-import com.github.hatoyuze.shiromi.gui.presentation.components.ChatSidebar
-import com.github.hatoyuze.shiromi.gui.presentation.components.MessageActionBar
-import com.github.hatoyuze.shiromi.gui.presentation.components.MessageBubble
+import com.github.hatoyuze.shiromi.gui.presentation.components.*
 import com.github.hatoyuze.shiromi.gui.presentation.components.askuser.AskUserCard
-
-
-
-import com.github.hatoyuze.shiromi.gui.presentation.components.ProblemDetailPage
-import com.github.hatoyuze.shiromi.gui.presentation.components.PulsatingDot
-import com.github.hatoyuze.shiromi.gui.presentation.components.RightSideSheet
-import com.github.hatoyuze.shiromi.gui.presentation.components.ThinkingIndicator
 import com.github.hatoyuze.shiromi.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.shiromi.gui.presentation.state.ChatEvent
 import com.github.hatoyuze.shiromi.gui.presentation.state.ChatUiState
@@ -102,11 +52,9 @@ import com.github.hatoyuze.shiromi.gui.theme.LocalThemeIsDark
 import com.mikepenz.markdown.model.DefaultMarkdownTypography
 import com.mikepenz.markdown.model.MarkdownTypography
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.ChevronLeft
-import compose.icons.feathericons.ChevronRight
-import compose.icons.feathericons.Moon
-import compose.icons.feathericons.Send
-import compose.icons.feathericons.Sun
+import compose.icons.feathericons.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 @Composable
@@ -179,9 +127,6 @@ private fun MainContent(
 ) {
     val state = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
-        state.animateScrollToItem(messages.size)
-    }
     Column(modifier = modifier.fillMaxSize()) {
 
         // ── 顶栏：会话标题 + 类型/消息数 + 主题切换（对齐移动端对话页头）──
@@ -350,22 +295,6 @@ private fun MainContent(
 }
 
 
-/**
- * 智能贴底判定：最后可见项位于末尾 2 项内（即视口下方至多 1 项）时允许自动跟随；
- * 用户上翻阅读（离开底部）时返回 false，不打扰。
- */
-internal fun shouldAutoFollow(
-    lastVisibleIndex: Int,
-    totalItemsCount: Int,
-): Boolean = totalItemsCount <= 0 || lastVisibleIndex >= totalItemsCount - 2
-
-private fun shouldAutoFollow(state: LazyListState): Boolean {
-    // 用户正在主动滚动时绝不抢滚动
-    if (state.isScrollInProgress) return false
-    val info = state.layoutInfo
-    return shouldAutoFollow(info.visibleItemsInfo.lastOrNull()?.index ?: 0, info.totalItemsCount)
-}
-
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun ChatMessages(
@@ -379,32 +308,17 @@ internal fun ChatMessages(
     alwaysShowActions: Boolean = false,
     compact: Boolean = false,
     onOpenProblem: ((String) -> Unit)? = null,
+    onPinnedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // 新消息到达 → 动画滚动到底
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) state.animateScrollToItem(messages.size - 1)
-    }
-
-    // 流式输出智能贴底（仅移动端 compact）：
-    // - key 覆盖思考流（segments 增长）与内容流（content 增长），思考期间也能跟随；
-    // - 布局判定走 snapshotFlow：内容增长（key 变化）或布局变化（滚动/测量）都会触发
-    //   重新评估，且滚动进行中/用户已上翻（shouldAutoFollow=false）绝不打扰；
-    // - 滚动到 index == itemCount（被钳制到内容末尾），确保看到最新尾部而非项顶。
-    if (compact) {
-        val lastMessage = messages.lastOrNull()
-        LaunchedEffect(
-            lastMessage?.id,
-            lastMessage?.segments?.size,
-            lastMessage?.segments?.lastOrNull()?.let { seg -> (seg as? MessageSegment.Text)?.text?.length } ?: 0,
-            lastMessage?.content?.length,
-        ) {
-            if (messages.isNotEmpty()) {
-                snapshotFlow { shouldAutoFollow(state) }
-                    .collect { nearBottom -> if (nearBottom) state.scrollToItem(messages.size) }
-            }
-        }
-    }
+    // 贴底跟随控制器：滚动只由内容增长触发，用户滚动/松手从不被抢；
+    // 返回 pinned，供 UI 显示「回到底部」按钮。
+    rememberChatAutoScroll(
+        state = state,
+        messages = messages,
+        streamFollowEnabled = compact,
+        onPinnedChange = onPinnedChange,
+    )
 
     LazyColumn(
         state = state,
