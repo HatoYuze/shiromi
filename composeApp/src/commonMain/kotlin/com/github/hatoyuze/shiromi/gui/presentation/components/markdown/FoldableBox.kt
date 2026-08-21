@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.hatoyuze.shiromi.gui.presentation.markdown.FoldableFlavourDescriptor
 import com.mikepenz.markdown.compose.components.markdownComponents
@@ -196,7 +195,7 @@ fun FoldableBoxContent(
                             components = markdownComponents(
                                 codeBlock = highlightedCodeBlock,
                                 codeFence = highlightedCodeFence,
-                                table = { CuteTableAwareTable(it) },
+                                table = { ShiromiTable(it) },
                                 paragraph = { MathAwareParagraph(it) },
                                 custom = { type, model ->
                                     traverseUnhandledNode(type, model)
@@ -207,9 +206,6 @@ fun FoldableBoxContent(
                                 dividerThickness = 1.dp,
                                 codeBackgroundCornerSize = 12.dp,
                                 blockQuoteThickness = 2.dp,
-                                tableMaxWidth = Dp.Unspecified,
-                                tableCellWidth = 160.dp,
-                                tableCellPadding = 16.dp,
                                 tableCornerSize = 8.dp,
                             ),
                             padding = markdownPadding(

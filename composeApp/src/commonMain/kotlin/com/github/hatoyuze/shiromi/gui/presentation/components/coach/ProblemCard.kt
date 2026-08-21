@@ -52,6 +52,7 @@ import kotlinx.coroutines.launch
 import com.github.hatoyuze.shiromi.gui.domain.model.MessageSegment
 import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.CachingImageTransformer
 import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.MathAwareParagraph
+import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.ShiromiTable
 import com.github.hatoyuze.shiromi.gui.presentation.components.icons.AppIcons
 import com.github.hatoyuze.shiromi.gui.presentation.markdown.FoldableFlavourDescriptor
 import compose.icons.FeatherIcons
@@ -393,6 +394,7 @@ private fun ProblemSection(title: String, content: String) {
             components = markdownComponents(
                 codeBlock = highlightedCodeBlock,
                 codeFence = highlightedCodeFence,
+                table = { ShiromiTable(it) },
                 paragraph = { MathAwareParagraph(it) },
             ),
             dimens = markdownDimens(

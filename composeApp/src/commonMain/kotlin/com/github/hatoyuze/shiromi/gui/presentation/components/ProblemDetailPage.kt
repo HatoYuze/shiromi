@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.CachingImageTransformer
 import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.MathAwareParagraph
+import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.ShiromiTable
 import com.github.hatoyuze.shiromi.gui.presentation.markdown.FoldableFlavourDescriptor
 import com.github.hatoyuze.shiromi.gui.domain.chat.ChatService
 import com.github.hatoyuze.shiromi.protocol.api.DifficultyLevel
@@ -594,6 +595,7 @@ private fun MarkdownSection(title: String, content: String) {
             components = markdownComponents(
                 codeBlock = highlightedCodeBlock,
                 codeFence = highlightedCodeFence,
+                table = { ShiromiTable(it) },
                 paragraph = { MathAwareParagraph(it) },
             ),
             dimens = markdownDimens(dividerThickness = 1.dp, codeBackgroundCornerSize = 8.dp),

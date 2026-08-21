@@ -35,7 +35,7 @@ import com.github.hatoyuze.shiromi.gui.domain.model.TextType
 import com.github.hatoyuze.shiromi.gui.domain.model.ToolCallInfo
 import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.CachingImageTransformer
 import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.MathAwareParagraph
-import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.CuteTableAwareTable
+import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.ShiromiTable
 import com.github.hatoyuze.shiromi.gui.presentation.components.markdown.traverseUnhandledNode
 import com.github.hatoyuze.shiromi.gui.presentation.components.coach.CoachFinishedCard
 import com.github.hatoyuze.shiromi.gui.presentation.components.coach.ProblemCardComposable
@@ -205,7 +205,7 @@ fun MessageBubble(
                                     components = markdownComponents(
                                         codeBlock = highlightedCodeBlock,
                                         codeFence = highlightedCodeFence,
-                                        table = { CuteTableAwareTable(it) },
+                                        table = { ShiromiTable(it) },
                                         paragraph = { MathAwareParagraph(it) },
                                         custom = { type, model ->
                                             traverseUnhandledNode(type, model)
@@ -394,7 +394,7 @@ private fun SegmentedBody(
                 components = markdownComponents(
                     codeBlock = highlightedCodeBlock,
                     codeFence = highlightedCodeFence,
-                    table = { CuteTableAwareTable(it) },
+                    table = { ShiromiTable(it) },
                     paragraph = { MathAwareParagraph(it) },
                     custom = { type, model ->
                         traverseUnhandledNode(type, model)
