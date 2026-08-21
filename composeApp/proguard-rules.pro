@@ -41,6 +41,14 @@
     native <methods>;
 }
 
+# ---------- kompressor（zstd JNI 包装） ----------
+# libzstd-jni.so 的 JNI_OnLoad 按名字 GetFieldID 查找 ZstdWrapper 的字段
+# （INSTANCE / platformFileName 等）；混淆会把字段改名、构造合并进 <clinit>，
+# 导致 GetFieldID 抛 NoSuchFieldError 后 JNI 继续调用 → ART 断言 → SIGABRT 闪退。
+# 故该类及其全部成员必须保留原名（类名可借 native 方法规则幸存，但字段不会）。
+-keep class com.ensody.kompressor.** { *; }
+-dontwarn com.ensody.kompressor.**
+
 # ---------- SQLDelight / sqlite-jdbc ----------
 -keep class app.cash.sqldelight.** { *; }
 -keep class org.sqlite.** { *; }
