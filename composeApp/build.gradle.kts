@@ -18,6 +18,15 @@ val releaseVersionCode: Int = (System.getenv("APP_VERSION_CODE") ?: prop("appVer
 // 预发布后缀（如 0.1.0-beta.1）会被 Compose 插件校验拒绝，故剥掉后缀；Android versionName 保留完整版本。
 val desktopPackageVersion: String = releaseVersion.substringBefore('-').ifBlank { releaseVersion }
 
+// macOS 的 jpackage 拒绝版本首段为 0（"The first number in an app-version cannot be zero or negative"），
+// 仅 macOS 打包时把 0.x.y 映射为 1.x.y（其余平台保持原版本；映射单调，0.x 之间升级无冲突）。
+// ⚠️ 过渡约定：正式转 1.x.y 时，首个真实 1.x.y 的 Release 说明必须要求用户先卸载已装的 0.x 版本
+// （0.x 的 dmg bundle 版本已占用 1.x.y，同版本覆盖可能被系统拒绝）。
+val macPackageVersion: String = desktopPackageVersion.split('.').let { parts ->
+    val head = parts.firstOrNull()?.toIntOrNull()
+    if (head == 0) listOf("1") + parts.drop(1) else parts
+}.joinToString(".")
+
 // 本机 Android release 签名配置：读取 ~/.android/keystore.properties（不入仓库，仓库保持可移植）。
 // 文件缺失时 release 产物保持 unsigned 并给出 apksigner 手动签名提示；文件损坏时降级为 unsigned 并告警，
 // 不因本机签名配置问题拖垮桌面/iOS 等其他构建任务。
@@ -270,9 +279,15 @@ android {
 
     if (androidKeystoreProps != null) {
         signingConfigs.create("release") {
-            // 相对路径按 ~/.android/ 解析（properties 文件所在目录），绝对路径原样使用
-            storeFile = file(androidKeystoreProps.getProperty("storeFile")).let {
-                if (it.isAbsolute) it else androidKeystoreDir.resolve(it.path)
+            // 相对路径按 ~/.android/ 解析（properties 文件所在目录），绝对路径原样使用。
+            // 注意不能在 file() 之后再判 isAbsolute：Gradle 的 file() 会把相对路径先解析成
+            // 项目目录下的绝对 File，导致 isAbsolute 恒为 true、回退分支失效（CI 上
+            // storeFile=release.keystore 曾因此错误指向 composeApp/release.keystore）。
+            val storeFilePath = androidKeystoreProps.getProperty("storeFile")
+            storeFile = if (File(storeFilePath).isAbsolute) {
+                file(storeFilePath)
+            } else {
+                androidKeystoreDir.resolve(storeFilePath)
             }
             storePassword = androidKeystoreProps.getProperty("storePassword")
             keyAlias = androidKeystoreProps.getProperty("keyAlias")
@@ -342,7 +357,7 @@ compose.desktop {
                 else -> error("Unsupported distribution target: $distTarget")
             }
             packageName = "shiromi"
-            packageVersion = desktopPackageVersion
+            packageVersion = if (distTarget == "macos") macPackageVersion else desktopPackageVersion
 
             if (distTarget == "windows") {
                 windows {

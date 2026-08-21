@@ -45,7 +45,7 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
-  # ── Windows: exe + msi + 可运行 app zip ──
+  # ── Windows: exe + msi（分别作为独立 Release 资产发布，不再打包 app 目录）──
   build-windows:
     needs: resolve-version
     runs-on: windows-latest
@@ -90,9 +90,6 @@ jobs:
           if (-not $exe -or -not $msi) { throw "exe/msi artifact not found" }
           Move-Item $exe.FullName "dist-windows\$base.exe"
           Move-Item $msi.FullName "dist-windows\$base.msi"
-          $app = Get-ChildItem 'composeApp\build\compose\binaries\main\app' -Directory | Select-Object -First 1
-          if (-not $app) { throw "app dir not found" }
-          Compress-Archive -Path $app.FullName -DestinationPath "dist-windows\$base.zip"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -101,7 +98,7 @@ jobs:
           path: dist-windows
           retention-days: 14
 
-  # ── Linux: deb + 可运行 app tar.gz（Compose 1.11 已弃用 AppImage，无产物）──
+  # ── Linux: deb（单独作为 Release 资产发布；Compose 1.11 已弃用 AppImage，无其他产物）──
   build-linux:
     needs: resolve-version
     runs-on: ubuntu-latest
@@ -148,9 +145,6 @@ jobs:
           deb=$(find composeApp/build/compose/binaries/main/deb -name '*.deb' | head -1)
           [ -n "$deb" ] || { echo "deb not found"; exit 1; }
           mv "$deb" "dist-linux/shiromi-$VERSION-linux-x64.deb"
-          app=$(find composeApp/build/compose/binaries/main/app -mindepth 1 -maxdepth 1 -type d | head -1)
-          [ -n "$app" ] || { echo "app dir not found"; exit 1; }
-          tar -czf "dist-linux/shiromi-$VERSION-linux-x64.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
