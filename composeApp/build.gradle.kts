@@ -2,8 +2,14 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Properties
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 
 val prop = { key: String -> (project.findProperty(key) as String?) ?: "" }
 
@@ -382,6 +388,93 @@ tasks.matching { it.name == "createRuntimeImage" }.configureEach {
         .enumConstants!!.first { (it as Enum<*>).name == "ZIP" }
     @Suppress("UNCHECKED_CAST")
     (field.get(this) as org.gradle.api.provider.Property<Any?>).set(zipLevel)
+}
+
+// ── fat jar 平台裁剪：jpackage 打包前剔除依赖 jar 里非当前平台的原生库 ──
+// sqlite-jdbc / jna / zstd / kompressor 的 jar 内置了 20+ 平台的原生库（实测死重 ~30M），
+// 运行时只加载当前平台那一份。做法：在 afterEvaluate 重建打包任务的 classpath
+// （AbstractJPackageTask.files 公共 API），用裁剪版 jar 替换原 fat jar；升级 CMP 需验证。
+val desktopPackageTaskNames = setOf(
+    "createDistributable", "packageAppImage", "packageDeb", "packageDmg", "packageExe", "packageMsi", "packageRpm",
+)
+val fatJarNameTokens = listOf("sqlite-jdbc", "jna-", "zstd-libzstd-jvm", "kompressor-zstd--nativelib")
+
+// 返回裁剪后的 jar（无裁剪时返回原文件）。保留规则按已知原生库目录约定，未知条目一律保留。
+
+// 裁剪产物输出到 build 目录（绝不能写到 Gradle 缓存里源 jar 旁边）
+val trimmedJarsDir = layout.buildDirectory.dir("compose/trimmed-jars")
+
+fun trimJarForCurrentPlatform(jar: File, outDir: File): File {
+    val hostOs = System.getProperty("os.name").lowercase()
+    val hostArch = System.getProperty("os.arch").lowercase()
+    val x64 = hostArch in setOf("x86_64", "amd64", "x64")
+    val arm64 = hostArch in setOf("aarch64", "arm64")
+    // 已知原生库目录的保留规则；未知路径的原生条目一律保留（安全优先）。
+    fun keep(entry: String): Boolean {
+        val p = entry.lowercase()
+        val isNative = p.endsWith(".so") || p.endsWith(".dll") || p.endsWith(".dylib")
+        if (!isNative) return true
+        val wanted = when {
+            p.contains("org/sqlite/native/") -> when {
+                hostOs.contains("linux") -> if (x64) "linux/x86_64" else "linux/aarch64"
+                hostOs.contains("mac") -> if (arm64) "mac/aarch64" else "mac/x86_64"
+                hostOs.contains("windows") -> if (x64) "windows/x86_64" else "windows/aarch64"
+                else -> null
+            }
+            p.contains("com/sun/jna/") -> when {
+                hostOs.contains("linux") -> if (x64) "linux-x86-64" else "linux-aarch64"
+                hostOs.contains("mac") -> if (arm64) "darwin-aarch64" else "darwin-x86-64"
+                hostOs.contains("windows") -> if (x64) "win32-x86-64" else "win32-aarch64"
+                else -> null
+            }
+            p.contains("jni/") -> when {
+                hostOs.contains("linux") -> if (x64) "jni/linuxx64" else "jni/linuxarm64"
+                hostOs.contains("mac") -> if (arm64) "jni/macosarm64" else "jni/macosx64"
+                hostOs.contains("windows") -> "jni/mingwx64"
+                else -> null
+            }
+            else -> null
+        }
+        return wanted == null || p.contains(wanted)
+    }
+    val out = File(outDir, jar.name)
+    if (out.isFile && out.lastModified() >= jar.lastModified()) return out // 已裁剪过，复用
+    if (out.exists()) out.delete()
+    var removed = 0
+    ZipFile(jar).use { zin ->
+        ZipOutputStream(FileOutputStream(out)).use { zout ->
+            val entries = zin.entries()
+            while (entries.hasMoreElements()) {
+                val e = entries.nextElement()
+                if (!keep(e.name)) { removed++; continue }
+                zout.putNextEntry(ZipEntry(e.name))
+                zin.getInputStream(e).use { it.copyTo(zout) }
+                zout.closeEntry()
+            }
+        }
+    }
+    if (removed == 0) { out.delete(); return jar }
+    return out
+}
+
+// 打包任务的 classpath 由插件在配置期填入；属性在配置结束后即 finalize（doFirst 里 setFrom
+// 会报 "final and cannot be changed"）。因此在 afterEvaluate 读取插件最终内容并重建集合：
+// 保留全部条目，仅把 fat jar 换成裁剪版（含插件额外追加的主 jar 等）。
+afterEvaluate {
+    tasks.matching { it.name in desktopPackageTaskNames }.configureEach {
+        (this as? AbstractJPackageTask)?.let { pkg ->
+            val original = pkg.files.files.toList()
+            val (fat, rest) = original.partition { f -> fatJarNameTokens.any { f.name.contains(it) } }
+            if (fat.isNotEmpty()) {
+                val outDir = trimmedJarsDir.get().asFile.also { it.mkdirs() }
+                val trimmed = fat.map { trimJarForCurrentPlatform(it, outDir) }
+                println("🧹 裁剪 fat jar 原生库: " + fat.zip(trimmed).joinToString { (a, b) ->
+                    "${a.name}: ${a.length() / 1024}K -> ${b.length() / 1024}K"
+                })
+                pkg.files.setFrom(trimmed + rest)
+            }
+        }
+    }
 }
 
 sqldelight {
