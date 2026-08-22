@@ -368,6 +368,22 @@ compose.desktop {
     }
 }
 
+// ── jlink 运行时压缩（CMP 未公开的 internal 选项，用反射开启 --compress=2）──
+// CMP 的 AbstractJLinkTask.compressionLevel 是 internal（源码注释 "todo: public DSL"），
+// 默认不压缩 modules 镜像（本机实测 45M）。设为 ZIP 后约 28M，整包约 -15M。
+// 副作用：启动时多一步解压，可忽略。等 CMP 公开 jlinkOptions 后可删除本段。
+tasks.matching { it.name == "createRuntimeImage" }.configureEach {
+    val field = generateSequence(javaClass as Class<*>) { it.superclass }
+        .firstOrNull { cls -> cls.declaredFields.any { it.name == "compressionLevel" } }
+        ?.getDeclaredField("compressionLevel")
+    checkNotNull(field) { "createRuntimeImage.compressionLevel 字段不存在，CMP 内部结构可能已变更" }
+    field.isAccessible = true
+    val zipLevel = Class.forName("org.jetbrains.compose.desktop.application.internal.RuntimeCompressionLevel")
+        .enumConstants!!.first { (it as Enum<*>).name == "ZIP" }
+    @Suppress("UNCHECKED_CAST")
+    (field.get(this) as org.gradle.api.provider.Property<Any?>).set(zipLevel)
+}
+
 sqldelight {
     databases {
         create("LuoguDatabase") {
