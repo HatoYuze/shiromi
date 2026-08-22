@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+     SPDX-License-Identifier: AGPL-3.0-or-later -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 图标为纯白满铺背景：背景层与前景层同为白色，视觉上合并为白色圆形底 + 居中主体 -->
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+</adaptive-icon>

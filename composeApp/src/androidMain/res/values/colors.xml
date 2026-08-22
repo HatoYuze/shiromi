@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Yukiky (hatoyuze) <yukikyovo@qq.com>
+     SPDX-License-Identifier: AGPL-3.0-or-later -->
+<resources>
+    <!-- 启动图标背景：与图标本身的纯白背景一致，前景层白底与背景融为一体 -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

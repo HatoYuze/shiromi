@@ -365,9 +365,19 @@ compose.desktop {
             packageName = "shiromi"
             packageVersion = if (distTarget == "macos") macPackageVersion else desktopPackageVersion
 
-            if (distTarget == "windows") {
-                windows {
+            // 平台安装包图标（源资产由 scripts/generate_icons.py 从 shiromi_icon.png 生成）：
+            // Windows .ico（16–256 多尺寸）嵌入 exe/msi；macOS .icns（16–1024）作为 .app/Dock 图标；
+            // Linux 512×512 PNG 供 .deb 桌面条目与安装器使用。
+            when (distTarget) {
+                "windows" -> windows {
                     menuGroup = "shiromi"
+                    iconFile.set(project.file("src/jvmMain/resources/icons/shiromi.ico"))
+                }
+                "macos" -> macOS {
+                    iconFile.set(project.file("src/jvmMain/resources/icons/shiromi.icns"))
+                }
+                "linux" -> linux {
+                    iconFile.set(project.file("src/jvmMain/resources/icons/shiromi_512.png"))
                 }
             }
         }

@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: LicenseRef-IconByMgAlLay
+
+# LicenseRef-IconByMgAlLay — 应用图标授权协议
+
+本授权协议（下称「本协议」）适用于 shiromi 项目仓库内的应用图标及其全部
+派生格式资产。以本协议取代对上述资产可能适用的任何其他授权声明。
+
+## 适用范围（Scope）
+
+- 原始文件：`shiromi_icon.png`
+- 桌面端窗口/安装包图标：`composeApp/src/jvmMain/resources/icons/`
+  （`shiromi.ico`、`shiromi.icns`、`shiromi_window.png`、`shiromi_512.png`）
+- 应用内品牌图标：`composeApp/src/commonMain/composeResources/drawable/shiromi_icon.png`
+- Android 启动图标：`composeApp/src/androidMain/res/`
+  （mipmap 各密度 `ic_launcher.png`、自适应图标前景层 `ic_launcher_foreground.png`）
+- iOS 应用图标：`iosApp/shiromi/Assets.xcassets/AppIcon.appiconset/`
+- 文档徽标：`.readme/images/logo.png`
+
+## 1. 版权归属（Copyright）
+
+Copyright © 2026 MgAl_Lay（2694419779@qq.com）。保留所有权利
+（All rights reserved）。
+
+图标美术作品由 MgAl_Lay 创作并提供；本项目仅进行尺寸缩放与格式转换
+（PNG / ICO / ICNS / Android mipmap / iOS AppIcon）等派生处理，
+未对图形本身进行修改。
+
+## 2. 授权许可（Grant of License）
+
+在遵守本协议第 3 条的前提下，创作者授予 shiromi 项目以下权利：
+
+1. 在项目内复制、使用、展示该图标及其派生资产；
+2. 对该图标进行尺寸缩放与格式转换，并制作派生资产；
+3. 将图标及其派生资产随本项目源代码与构建产物一并分发。
+
+## 3. 限制条件（Restrictions）
+
+1. **署名义务**：使用或分发图标及其派生资产时，须保留创作者署名
+   「MgAl_Lay」；
+2. **商用前置许可**：任何商业用途（包括但不限于商业软件发行、付费分发、
+   商业宣传、商标性使用）前，**必须与创作者联系并确认其用意**；
+   联系邮箱：2694419779@qq.com；
+3. **署名完整性**：不得虚假声明或暗示图标作者，不得以误导方式呈现
+   创作者与本项目的关系。
+
+## 4. 效力与解释（Effect and Interpretation）
+
+本协议仅适用于第 1 条所列图标资产；项目其余代码适用
+`LICENSE`（AGPL-3.0-or-later，文本见 `LICENSES/AGPL-3.0-or-later.txt`）。
+未经创作者另行书面许可，不得对图标资产主张超出本协议范围的任何权利。
+
+## 5. 联系（Contact）
+
+MgAl_Lay <2694419779@qq.com>
