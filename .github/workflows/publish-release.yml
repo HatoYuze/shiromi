@@ -251,7 +251,9 @@ jobs:
           set -euo pipefail
           bt=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
           for apk in composeApp/build/outputs/apk/release/*.apk; do
-            "$ANDROID_HOME/build-tools/$bt/apksigner" verify --print-certs "$apk" | grep -q 'Signer #1'
+            # apksigner 退出码即签名校验结果；--print-certs 输出随版本而异
+            # （v2-only 显示 "V2 Signer:"，老版本显示 "Signer #1:"），不要 grep 具体字样
+            "$ANDROID_HOME/build-tools/$bt/apksigner" verify --print-certs "$apk"
             echo "signed OK: $apk"
           done
 
@@ -264,8 +266,8 @@ jobs:
           cd composeApp/build/outputs/apk/release
           for apk in *.apk; do
             case "$apk" in
-              *arm64-v8a*) mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-arm64-v8a.apk" ;;
-              *x86_64*)    mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-x86_64.apk" ;;
+              *arm64-v8a*) mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-arm64.apk" ;;
+              *x86_64*)    mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-x64.apk" ;;
               *universal*) mv "$apk" "$OLDPWD/dist-android/shiromi-$VERSION-android-universal.apk" ;;
               *) echo "unexpected apk: $apk"; exit 1 ;;
             esac
@@ -309,9 +311,14 @@ jobs:
 
       - name: Build unsigned iOS simulator app
         run: |
+          # 必须固定 destination 并限定 arm64：不指定时 xcodebuild 在 arm64 runner 上
+          # 默认取 x86_64，而项目只有 iosSimulatorArm64 target（syncComposeResourcesForIos 报
+          # "Unknown iOS simulator arch: 'x86_64'"）。
           xcodebuild -project iosApp/shiromi.xcodeproj -scheme shiromi \
             -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath composeApp/build/ios-simulator \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO build
 
       - name: Package simulator app
